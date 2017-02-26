@@ -59,7 +59,7 @@ server(unit) ->
   receive {start, Sender} ->
     io:format("Starting~n", []),
     case file:open("file.txt") of
-    {{success, F}, Sender} ->
+    {success, F} ->
        Sender!{ok, self()},
        file:read_into(F)(fun(Value) -> Sender!{{value, Value}, self()} end);
     _ ->
