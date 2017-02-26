@@ -49,3 +49,40 @@ fun main
   spawn Client server
 end
 ```
+
+The above example compiles into the following Erlang output:
+
+```erlang
+-export([server/1, client/1, main/1]).
+
+server(unit) ->
+  receive {start, Sender} ->
+    io:format("Starting~n", []),
+    case file:open("file.txt") of
+    {{success, F}, Sender} ->
+       Sender!{ok, self()},
+       file:read_into(F)(fun(Value) -> Sender!{{value, Value}, self()} end);
+    _ ->
+        Sender!{err, self()}
+    end
+  end.
+
+client(Target) ->
+  io:format("Starting~n", []),
+  Target!{start, self()},
+  
+  receive
+    {ok, Sender} ->
+      receive {{value, Status}, Sender} ->
+        print(Status),
+        close(unit)
+      end;
+    {err, Sender} ->
+      print("Server-side error when opening file"),
+      close(unit)
+  end.
+
+main(_) ->
+  Server = spawn(ex, server, [unit]),
+  spawn(ex, client, [Server]).
+```
