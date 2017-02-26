@@ -19,7 +19,7 @@ session Server
     case File.open "file.txt"
     when Success f
       sender!Ok
-      f.read :into:sender!Value
+      File.read_into f sender!Value
     else
       sender!Err
     end
@@ -46,6 +46,6 @@ end
 
 fun main
   let server = spawn Server
-  Client target
+  spawn Client server
 end
 ```
