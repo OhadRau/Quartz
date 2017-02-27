@@ -1,14 +1,15 @@
 # Quartz
 
-Quartz is a statically typed programming concurrent language for the BEAM VM based on the actor model with a sleek, Ruby-based syntax and support for functional and object-oriented programming.
+Quartz is a statically typed, concurrent programming language for the BEAM VM based on the actor model with a sleek, Ruby-based syntax and support for functional and object-oriented programming.
 
 ## Features
 
 * Familiar Ruby-like syntax
 * First-class concurrency primitives
 * Actor model message passing à la Erlang
-* Static typing for messages based on session types
+* Static typing for messages based on multiparty session types
 * Duality checking
+* Structural subtyping
 * First-class functions
 
 ## Examples
