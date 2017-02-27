@@ -1,46 +1,45 @@
 module Ast where
 
 import Data.List (intercalate)
-import Data.Text (Text, unpack)
 
-data ModIdent = MIdent [Text]
+data ModIdent = MIdent [String]
   deriving (Eq)
 
 instance Show ModIdent where
-  show (MIdent xs) = intercalate "." $ map unpack xs
+  show (MIdent xs) = intercalate "." xs
 
-data TypIdent = TIdent ModIdent Text
+data TypIdent = TIdent ModIdent String
   deriving (Eq)
 
 instance Show TypIdent where
-  show (TIdent ms t) = show ms ++ "." ++ unpack t
+  show (TIdent ms t) = show ms ++ "." ++ t
 
-data ValIdent = VIdent ModIdent Text
+data ValIdent = VIdent ModIdent String
   deriving (Eq)
 
 instance Show ValIdent where
-  show (VIdent ms t) = show ms ++ "." ++ unpack t
+  show (VIdent ms t) = show ms ++ "." ++ t
 
 data Type
-  = TVar Text
+  = TVar String
   | TApp TypIdent [Type]
   | TArrow Type Type
-  | TQuant Text Type (Maybe Constraint)
-  | TRec Text Type
+  | TQuant String Type (Maybe Constraint)
+  | TRec String Type
   | TDual Type
-  | TOffer Type [(Text, Type, Type)]
+  | TOffer Type [(String, Type, Type)]
   deriving (Eq)
 
-showOffer (label, param, t) = unpack label ++ " : " ++ show param ++ " -> " ++ show t
+showOffer (label, param, t) = label ++ " : " ++ show param ++ " ~> " ++ show t
 
 instance Show Type where
-  show (TVar tv) = unpack tv
+  show (TVar tv) = tv
   show (TApp t []) = show t
   show (TApp t ts) = show t ++ " " ++ intercalate " " (map show ts)
   show (TArrow t1 t2) = show t1 ++ " -> " ++ show t2
-  show (TQuant tv t Nothing) = "forall " ++ unpack tv ++ "." ++ show t
-  show (TQuant tv t (Just c)) = "forall " ++ unpack tv ++ show c ++ "." ++ show t
-  show (TRec tv t) = "rec " ++ unpack tv ++ "." ++ show t
+  show (TQuant tv t Nothing) = "forall " ++ tv ++ "." ++ show t
+  show (TQuant tv t (Just c)) = "forall " ++ tv ++ show c ++ "." ++ show t
+  show (TRec tv t) = "rec " ++ tv ++ "." ++ show t
   show (TDual (TOffer t os)) = "+" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
   show (TOffer t os) = "&" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
   show (TDual t) = show t ++ "*"

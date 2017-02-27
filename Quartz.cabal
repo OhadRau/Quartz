@@ -36,6 +36,7 @@ executable Quartz
                        UnicodeSyntax,
                        ViewPatterns
   build-depends:       base ==4.6.*,
+                       mtl ==2.2.*,
                        parsec ==3.1.*,
                        text ==1.2.*
   hs-source-dirs:      src/

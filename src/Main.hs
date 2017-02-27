@@ -1,11 +1,10 @@
 module Main where
 
-import Prelude hiding (readFile, putStrLn)
-import Data.Text
-import Data.Text.IO
+import Prelude
 import System.Environment
 
 import Ast
+import Parser
 
 compileFile :: FilePath -> IO ()
 compileFile file = readFile file >>= putStrLn
@@ -30,4 +29,5 @@ main :: IO ()
 main = do
   args <- getArgs
   mapM_ compileFile args
-  print myType
+  print $ parseType "test" (show myType)
+  -- print myType
