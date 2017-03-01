@@ -2,75 +2,65 @@ module Ast where
 
 import Data.List (intercalate)
 
-data ModIdent = MIdent [String]
-  deriving (Eq)
+import Type (Type)
+import Ident (ModIdent, TypIdent, ValIdent)
 
-instance Show ModIdent where
-  show (MIdent xs) = intercalate "." xs
+data Normal  -- In a normal context
+data Session -- In a session context
 
-data TypIdent = TIdent ModIdent String
-  deriving (Eq)
+newtype Ast = Ast [Top Normal]
 
-instance Show TypIdent where
-  show (TIdent ms t) = show ms ++ "." ++ t
+instance Show Ast where
+  show (Ast ts) = intercalate "\n\n" $ map show ts
 
-data ValIdent = VIdent ModIdent String
-  deriving (Eq)
+data Literal
+  = LBool Bool
+  | LInteger Int
+  | LDecimal Double
+  | LString String
 
-instance Show ValIdent where
-  show (VIdent ms t) = show ms ++ "." ++ t
+instance Show Literal where
+  show (LBool b) = show b
+  show (LInteger i) = show i
+  show (LDecimal d) = show d
+  show (LString s) = show s
 
-data Type
-  = TVar String
-  | TApp TypIdent [Type]
-  | TArrow Type Type
-  | TQuant String Type (Maybe Constraint)
-  | TRec String Type
-  | TDual Type
-  | TOffer Type [(String, Type, Type)]
-  deriving (Eq)
+data Expr a where
+  ELiteral :: Literal -> Expr a
+  EIdent :: ValIdent -> Expr a
+  ELet :: String -> Expr a -> Expr a -> Expr a
+  ESession :: [Top Session] -> Expr a
+  ECond :: Expr a -> Expr a -> Expr a -> Expr a
+  ELambda :: String -> Expr a -> Expr a
+  EApply :: Expr a -> Expr a -> Expr a
+  EBranch :: String -> [String] -> Expr Session -> Expr Session
+  ESpawn :: ValIdent -> Expr a
+  ESequence :: [Expr a] -> Expr a
 
-showOffer (label, param, t) = label ++ " : " ++ show param ++ " ~> " ++ show t
+instance forall a. Show (Expr a) where
+  show (ELiteral l) = show l
+  show (EIdent i) = show i
+  show (ELet n v c) = "let " ++ n ++ " = " ++ show v ++ "\n" ++ show c
+  show (ESession s) = intercalate "\n" $ map show s
+  show (ECond p t f) = "if " ++ show p ++ "\n" ++ show t ++ "\n" ++ show f ++ "\nend"
+  show (ELambda v e) = "do |" ++ v ++ "|\n" ++ show e ++ "\nend"
+  show (EApply f x) = show f ++ " " ++ show x
+  show (EBranch n vs e) = let vs' = intercalate " " (map show vs) in
+                          "branch " ++ n ++ " " ++ vs' ++ "\n" ++ show e ++ "\nend"
+  show (ESpawn n) = show n
+  show (ESequence es) = "begin\n" ++ intercalate "\n" (map show es) ++ "\nend"
 
-instance Show Type where
-  show (TVar tv) = tv
-  show (TApp t []) = show t
-  show (TApp t ts) = show t ++ " " ++ intercalate " " (map show ts)
-  show (TArrow t1 t2) = show t1 ++ " -> " ++ show t2
-  show (TQuant tv t Nothing) = "forall " ++ tv ++ "." ++ show t
-  show (TQuant tv t (Just c)) = "forall " ++ tv ++ show c ++ "." ++ show t
-  show (TRec tv t) = "rec " ++ tv ++ "." ++ show t
-  show (TDual (TOffer t os)) = "+" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
-  show (TOffer t os) = "&" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
-  show (TDual t) = show t ++ "*"
+data Top a where
+  TModule :: String -> [Top a] -> Top a
+  TRequire :: String -> Top a
+  TLet :: String -> Expr a -> Top a
+  TInit :: Expr Session -> Top Session
+  TBranch :: String -> [String] -> Expr Session -> Top Session
 
--- Requires GHC 7.8+
--- pattern TConst id = TApp id []
--- pattern TTuple ts = TApp "," ts
--- pattern (:->) t1 t2 = TArrow t1 t2
--- pattern (:.) tv t = TQuant tv t Nothing
--- pattern (:=) (TQuant tv t _) t2 = TQuant tv t (CEqual t2)
--- pattern (:<) (TQuant tv t _) t2 = TQuant tv t (CSubtype t2)
--- pattern TChoose other offers = TDual (TOffer other offers)
-
-data Constraint
-  = CEqual Type
-  | CSubtype Type
-  deriving (Eq)
-
-instance Show Constraint where
-  show (CEqual t) = " == " ++ show t
-  show (CSubtype t) = " <= " ++ show t
-
-normalize :: Type -> Type
-normalize (TApp a ts) = TApp a (map normalize ts)
-normalize (TArrow t1 t2) = TArrow (normalize t1) (normalize t2)
-normalize (TQuant n t c) = TQuant n (normalize t) (fmap normalizeConstraint c)
-  where normalizeConstraint (CEqual t) = CEqual (normalize t)
-        normalizeConstraint (CSubtype t) = CSubtype (normalize t)
-normalize (TRec n t) = TRec n (normalize t)
-normalize (TDual (TDual t)) = normalize t
-normalize (TDual t) = TDual (normalize t)
-normalize (TOffer p os) = TOffer (normalize p) (map normalizeOffer os)
-  where normalizeOffer (n, c, t) = (n, normalize c, normalize t)
-normalize t = t
+instance forall a. Show (Top a) where
+  show (TModule n ts) = "module " ++ n ++ "\n" ++ intercalate "\n" (map show ts) ++ "\nend"
+  show (TRequire m) = "require " ++ m
+  show (TLet n v) = "let " ++ n ++ " = " ++ show v
+  show (TInit e) = "init\n" ++ show e ++ "\nend"
+  show (TBranch n vs e) = let vs' = intercalate " " (map show vs) in
+                          "branch " ++ n ++ " " ++ vs' ++ "\n" ++ show e ++ "\nend"

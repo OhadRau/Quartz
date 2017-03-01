@@ -1,0 +1,15 @@
+require Test
+
+module Main
+  require Prelude
+
+  session f
+    init
+      x
+    end
+  end
+end
+
+fun main args
+  args
+end
