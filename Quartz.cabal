@@ -28,6 +28,7 @@ executable Quartz
                        NoMonomorphismRestriction,
                        OverloadedStrings,
                        ParallelListComp,
+                       PatternSynonyms,
                        QuasiQuotes,
                        RankNTypes,
                        ScopedTypeVariables,
@@ -35,8 +36,11 @@ executable Quartz
                        TypeOperators,
                        UnicodeSyntax,
                        ViewPatterns
-  build-depends:       base ==4.6.*,
-                       array ==0.4.*
+  build-depends:       base >=4.6.0.0,
+                       array >=0.4.0.0,
+                       containers >= 0.5.10.0,
+                       transformers >= 0.5.4.0,
+                       mtl >= 2.2.0
   build-tools:         alex, happy
   other-modules:       Parser, Lexer
   hs-source-dirs:      src/

@@ -24,18 +24,13 @@ instance Show Type where
   show (TQuant tv t Nothing) = "forall " ++ tv ++ "." ++ show t
   show (TQuant tv t (Just c)) = "forall " ++ tv ++ show c ++ "." ++ show t
   show (TRec tv t) = "rec " ++ tv ++ "." ++ show t
-  show (TDual (TOffer t os)) = "+" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
+  show (TChoose t os) = "+" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
   show (TOffer t os) = "&" ++ show t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
   show (TDual t) = show t ++ "*"
 
--- Requires GHC 7.8+
--- pattern TConst id = TApp id []
--- pattern TTuple ts = TApp "," ts
--- pattern (:->) t1 t2 = TArrow t1 t2
--- pattern (:.) tv t = TQuant tv t Nothing
--- pattern (:=) (TQuant tv t _) t2 = TQuant tv t (CEqual t2)
--- pattern (:<) (TQuant tv t _) t2 = TQuant tv t (CSubtype t2)
--- pattern TChoose other offers = TDual (TOffer other offers)
+pattern TTuple ts = TApp (TIdent (MIdent []) ",") ts
+pattern (:->) t1 t2 = TArrow t1 t2
+pattern TChoose target offers = TDual (TOffer target offers)
 
 data Constraint
   = CEqual Type
@@ -58,3 +53,20 @@ normalize (TDual t) = TDual (normalize t)
 normalize (TOffer p os) = TOffer (normalize p) (map normalizeOffer os)
   where normalizeOffer (n, c, t) = (n, normalize c, normalize t)
 normalize t = t
+
+-- Define common types
+
+preludeType :: String -> [Type] -> Type
+preludeType t = TApp (TIdent (MIdent ["Prelude"]) t)
+
+tInt :: Type
+tInt = preludeType "Int" []
+
+tBool :: Type
+tBool = preludeType "Bool" []
+
+tFloat :: Type
+tFloat = preludeType "Float" []
+
+tString :: Type
+tString = preludeType "String" []
