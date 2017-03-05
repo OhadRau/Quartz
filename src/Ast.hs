@@ -41,7 +41,7 @@ instance forall a. Show (Expr a) where
   show (ELiteral l) = show l
   show (EIdent i) = show i
   show (ELet n v c) = "let " ++ n ++ " = " ++ show v ++ "\n" ++ show c
-  show (ESession s) = intercalate "\n" $ map show s
+  show (ESession s) = "session\n" ++ intercalate "\n" (map show s) ++ "\nend"
   show (ECond p t f) = "if " ++ show p ++ "\n" ++ show t ++ "\n" ++ show f ++ "\nend"
   show (ELambda v e) = "do |" ++ v ++ "|\n" ++ show e ++ "\nend"
   show (EApply f x) = show f ++ " " ++ show x

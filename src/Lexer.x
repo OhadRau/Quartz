@@ -43,6 +43,8 @@ tokens :-
   \[                      { \s -> TokenOpenBracket }
   \]                      { \s -> TokenCloseBracket }
   
+  \=                      { \s -> TokenEqual }
+
   $lower [$alpha $digit]* { \s -> TokenVar s }
   $upper [$alpha $digit]* { \s -> TokenMident s }
   $digit+                 { \s -> TokenInt (read s) }

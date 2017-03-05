@@ -7,7 +7,17 @@ module Main
     init
       x
     end
+
+    branch greet name
+      1
+    end
   end
+end
+
+let x = 10
+
+fun f x y z
+  12
 end
 
 fun main args
