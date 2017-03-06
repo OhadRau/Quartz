@@ -11,7 +11,8 @@ data Type
   = TVar String
   | TApp TypIdent [Type]
   | TArrow Type Type
-  | TImplicit String Type
+  | TImplicit String Type Type
+  | TNamed String Type
   | TRec String Type
   | TDual Type
   | TOffer String [(String, Type, Type)]
@@ -24,7 +25,8 @@ instance Show Type where
   show (TApp t []) = show t
   show (TApp t ts) = show t ++ " " ++ intercalate " " (map show ts)
   show (TArrow t1 t2) = show t1 ++ " -> " ++ show t2
-  show (TImplicit s t) = "[" ++ s ++ " : " ++ show t ++ "] "
+  show (TImplicit s t u) = "[" ++ s ++ " : " ++ show t ++ "] " ++ show u
+  show (TNamed s t) = "(" ++ s ++ " : " ++ show t ++ ")"
   show (TRec tv t) = "rec " ++ tv ++ "." ++ show t
   show (TChoose t os) = "+" ++ t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"
   show (TOffer t os) = "&" ++ t ++ "{" ++ intercalate "; " (map showOffer os) ++ "}"

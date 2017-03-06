@@ -33,7 +33,8 @@ data Expr a where
   ECond :: Expr a -> Expr a -> Expr a -> Expr a
   ELambda :: String -> Expr a -> Expr a
   EApply :: Expr a -> Expr a -> Expr a
-  EBranch :: String -> [String] -> Expr Session -> Expr Session
+  EBranch :: String -> [String] -> Expr Session -> Expr Session -> Expr Session
+  EChoose :: Expr Session -> String -> Expr Session
   ESpawn :: ValIdent -> Expr a
   ESequence :: [Expr a] -> Expr a
 
@@ -45,8 +46,9 @@ instance forall a. Show (Expr a) where
   show (ECond p t f) = "if " ++ show p ++ "\n" ++ show t ++ "\n" ++ show f ++ "\nend"
   show (ELambda v e) = "do |" ++ v ++ "|\n" ++ show e ++ "\nend"
   show (EApply f x) = show f ++ " " ++ show x
-  show (EBranch n vs e) = let vs' = intercalate " " (map show vs) in
-                          "branch " ++ n ++ " " ++ vs' ++ "\n" ++ show e ++ "\nend"
+  show (EBranch n vs tgt e) = let vs' = intercalate " " (map show vs) in
+                              "branch " ++ n ++ " " ++ vs' ++ " from " ++ show tgt ++ "\n" ++ show e ++ "\nend"
+  show (EChoose tgt msg) = show tgt ++ "!" ++ msg
   show (ESpawn n) = show n
   show (ESequence es) = "begin\n" ++ intercalate "\n" (map show es) ++ "\nend"
 
@@ -55,12 +57,12 @@ data Top a where
   TRequire :: String -> Top a
   TLet :: String -> Expr a -> Top a
   TInit :: Expr Session -> Top Session
-  TBranch :: String -> [String] -> Expr Session -> Top Session
+  TBranch :: String -> [String] -> Expr Session -> Expr Session -> Top Session
 
 instance forall a. Show (Top a) where
   show (TModule n ts) = "module " ++ n ++ "\n" ++ intercalate "\n" (map show ts) ++ "\nend"
   show (TRequire m) = "require " ++ m
   show (TLet n v) = "let " ++ n ++ " = " ++ show v
   show (TInit e) = "init\n" ++ show e ++ "\nend"
-  show (TBranch n vs e) = let vs' = intercalate " " (map show vs) in
-                          "branch " ++ n ++ " " ++ vs' ++ "\n" ++ show e ++ "\nend"
+  show (TBranch n vs tgt e) = let vs' = intercalate " " (map show vs) in
+                              "branch " ++ n ++ " " ++ vs' ++ " from " ++ show tgt ++ "\n" ++ show e ++ "\nend"
