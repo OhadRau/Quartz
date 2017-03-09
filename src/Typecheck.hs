@@ -66,7 +66,7 @@ instance Substitutable Type where
     TDual t -> freeTVars t
     TOffer s os -> Set.unions $ map (\(_, i, r) -> freeTVars i `Set.union` freeTVars r) os
 
-instance Substitutable Scheme where -- )FIXME? Constraints treated wrong(?)
+instance Substitutable Scheme where -- FIXME? Constraints treated wrong(?)
   subst s (Forall ts t) = Forall (map substConstraint ts) (subst s' t)
     where s' = foldr Map.delete s ts
           substConstraint (s, Nothing) = (s, Nothing)
@@ -127,10 +127,14 @@ unify t u = case (t, u) of
     unifyOffers os os'
 
 instantiate :: Scheme -> Infer Type
-instantiate = undefined
+instantiate (Forall as t) = do
+  as' <- mapM (const fresh) as
+  let s = Map.fromList $ zip as as'
+  return $ subst s t
 
 generalize :: TypeEnv -> Type -> Scheme
-generalize = undefined
+generalize env t = Forall as t
+  where as = Set.toList $ freeTVars t `Set.difference` freeTVars env
 
 class Inferable a where
   infer :: TypeEnv -> a -> Infer (Subst, Type)
@@ -167,10 +171,25 @@ instance forall a. Inferable (Expr a) where
             TBranch msg args tgt e ->
 
     ECond pred t f ->
+      (sp, tp) <- infer env pred
+      (st, tt) <- infer env t
+      (sf, tf) <- infer env f
+      sp' <- unify tp tBool
+      sb' <- unify t f
+      return (sb' `compose` sp' `compose` sf `compose` st `compose` sp, subst sb' tt)
 
     ELambda id e ->
+      tv <- fresh
+      let env' = Map.insert id (Forall [] tv) env
+      (s, t) <- infer env' e
+      return (s, TArrow (subst s tv) t)
 
     EApply f x ->
+      tv <- fresh
+      (sf, tf) <- infer env f
+      (sx, tx) <- infer (subst sf env) x
+      s <- unify (subst sx tf) (TArrow tx tv)
+      return (s `compose` sx `compose` sf, subst s tv)
 
     EBranch msg args tgt e ->
 
@@ -178,7 +197,7 @@ instance forall a. Inferable (Expr a) where
 
     ESpawn v ->
 
-    ESequence s ->
+    ESequence ss -> infer env ss
 
 instance forall a. Inferable (Top a) where
   infer env e = case e of
@@ -209,6 +228,6 @@ prepareEnv :: forall a. [Top a] -> Infer TypeEnv
 prepareEnv [] = return Map.empty
 prepareEnv (t:ts) = case t of
   TLet id _ -> do
-    tyId <- fresh
-    return $ Map.insert id tyId (prepareEnv ts)
+    tv <- fresh
+    return $ Map.insert id (Forall [] tv) (prepareEnv ts)
   _ -> prepareEnv ts -- FIXME: Should imports, etc. be handled here?
