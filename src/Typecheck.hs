@@ -136,6 +136,22 @@ generalize :: TypeEnv -> Type -> Scheme
 generalize env t = Forall as t
   where as = Set.toList $ freeTVars t `Set.difference` freeTVars env
 
+-- Check the compatability between a variable session (tv) and a constant session (tc)
+-- FIXME: Consider skips (... &a{ L : t1 ~> ... p })
+isCompatible :: String -> Type -> Type -> Bool
+isCompatible id tv tc = case (tv, tc) of
+  (TOffer _ as, TChoose i bs) ->
+    i == id && (all $ zipWith (isBranchCompatible id) as bs)
+  (TChoose _ as, TOffer i bs) ->
+    i == id && (all $ zipWith (isBranchCompatible id) as bs)
+  (TNamed _ t1, TNamed _ t2) -> isCompatible id t1 t2
+  (TRec _ t1, TRec _ t2) -> isCompatible id t1 t2
+  (TVar _, _) -> true
+  (_, TVar _) -> true
+  where isBranchCompatible id (albl, at, ac) (blbl, bt, bc)
+          | albl == blbl = at == bt && isCompatible id ac bc
+          | otherwise = false
+
 class Inferable a where
   infer :: TypeEnv -> a -> Infer (Subst, Type)
 

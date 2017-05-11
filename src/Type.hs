@@ -48,11 +48,11 @@ instance Show Constraint where
 normalize :: Type -> Type
 normalize (TApp a ts) = TApp a (map normalize ts)
 normalize (TArrow t1 t2) = TArrow (normalize t1) (normalize t2)
-normalize (TImplicit s t) = TImplicit s (normalize t)
+normalize (TImplicit s t u) = TImplicit s (normalize t) (normalize u)
 normalize (TRec n t) = TRec n (normalize t)
 normalize (TDual (TDual t)) = normalize t
 normalize (TDual t) = TDual (normalize t)
-normalize (TOffer p os) = TOffer (normalize p) (map normalizeOffer os)
+normalize (TOffer p os) = TOffer p (map normalizeOffer os)
   where normalizeOffer (n, c, t) = (n, normalize c, normalize t)
 normalize t = t
 
