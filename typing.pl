@@ -15,7 +15,8 @@ type(Gamma, sendMsg(Who, Msg, Args, Then), sendMsg(Who, [Msg-(AT, TT)])) :-
 
 type(Gamma, recvMsg(Who, Msg, Args, Then), recvMsg(Who, [Msg-(AT, TT)])) :-
   compatible(recvMsg(Who, [Msg-(AT, TT)]), W),
-  Gamma1 = [Args:mono(AT), Who:W | Gamma],
+  % FIXME: What to do if Who is already bound? Conditional breaks this.
+  Gamma1 = [Who:W, Args:mono(AT) | Gamma],
   type(Gamma1, Then, TT).
 
 type(Gamma, [E], T) :- type(Gamma, E, T).
@@ -77,10 +78,6 @@ compatible(T, T) :-
   T \= recvMsg(_),
   T \= sendMsg(_, _),
   T \= recvMsg(_, _). % Any normal type is compatible with itself
-
-compatibleAux([B | Bs], X) :-
-  compatible(B, X)
-; compatibleAux(Bs, X).
 
 test(T) :-
    G = [ get_time : mono(unit -> time)
