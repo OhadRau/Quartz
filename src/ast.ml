@@ -50,7 +50,7 @@ and 'is_typed session_desc =
   | ELoop
   | EClose
   | ESend of identifier * string * ('is_typed, session) expr list * ('is_typed, session) expr list
-  | EBranch of string * string list * string * ('is_typed, session) expr list * ('is_typed, session) expr list
+  | EBranch of string * string list * string * ('is_typed, session) expr list
 
 type 'is_typed stmt =
   { stmt_desc  : 'is_typed stmt_desc
@@ -119,11 +119,10 @@ let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string =
         | ESend (id, msg, args, context) ->
           indent_string indent (string_of_identifier id ^ "!" ^ msg ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")") ^ "\n" ^
           String.concat "\n" (List.map (string_of_expr ~indent) context)
-        | EBranch (msg, args, id, body, context) ->
+        | EBranch (msg, args, id, body) ->
           indent_string indent ("branch " ^ msg ^ "(" ^ String.concat ", " args ^ ") from " ^ id) ^ "\n  " ^
           String.concat "\n  " (List.map (string_of_expr ~indent) body) ^ "\n" ^
-          indent_string indent "end\n" ^
-          String.concat "\n" (List.map (string_of_expr ~indent) context)
+          indent_string indent "end"
       end
 
 let rec string_of_stmt : type t. ?indent:int -> t stmt -> string =

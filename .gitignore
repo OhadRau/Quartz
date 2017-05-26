@@ -18,6 +18,8 @@ _build/
 # oasis generated files
 setup.data
 setup.log
+# causes problems when switching compiler versions
+setup.ml
 
 # project specific files
 spec/
