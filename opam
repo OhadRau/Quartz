@@ -1,0 +1,17 @@
+opam-version: "1.2"
+maintainer: "ohadrau <ohadrau@yahoo.com>"
+authors: "ohadrau <ohadrau@yahoo.com>"
+homepage: "http://ohad.space/proj/Quartz"
+bug-reports: "http://ohad.space/proj/Quartz/issues"
+license: "GPL"
+dev-repo: "http://ohad.space/proj/Quartz.git"
+build: [
+  ["./configure" "--prefix=%{prefix}%"]
+  [make]
+]
+install: [make "install"]
+remove: ["ocamlfind" "remove" "Quartz"]
+depends: [
+  "ocamlfind" {build}
+  "oasis" {build}
+]

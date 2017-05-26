@@ -1,0 +1,15 @@
+Name: Quartz
+Version: 0.1.0
+Synopsis: A strongly-typed concurrent programming language
+Authors: ohadrau <ohadrau@yahoo.com>
+License: GPL
+
+OASISFormat: 0.4
+BuildTools: ocamlbuild
+Plugins: META (0.4), DevFiles (0.4)
+
+Executable "Quartz"
+  Path: src/
+  MainIs: main.ml
+  CompiledObject: best
+  BuildDepends: 
