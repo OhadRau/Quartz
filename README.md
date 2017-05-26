@@ -15,44 +15,41 @@ Quartz is a statically typed, concurrent programming language for the BEAM VM ba
 ## Examples
 
 ```
-# Server: forall c < ...!{start: ~> ...?{ok: ~> Eps, err: ~> Eps}}.
+# Server: forall c < ...!{Start ~> ...?{Ok ~> Eps, Err(String) ~> Eps}}.
+#         rec self.
 #         [client : c]
-#         ?client{start: ~> !client{ok: ~> Eps, err: ~> Eps}}
+#         ?client{Start ~> !client{Ok ~> self, Err(String) ~> self}}
 session Server
-  branch start from sender
-    case File.open "file.txt"
-    when Success f
-      sender!ok
-      File.read_into f sender!Value
+  branch Start from sender
+    case File.open("file.txt")
+    when Success(f)
+      sender!Ok
+      File.read_into(f, |x| sender!Value(x) end)
     else
-      sender!err
+      sender!Err("Could not open file.txt!")
     end
   end
+  loop
 end
 
 # Client: (target : Server) ->
-#         !target{start: ~> ?target{ok: ~> Eps, err: ~> Eps}}
+#         !target{Start ~> ?target{Ok ~> Eps, Err(String) ~> Eps}}
 session Client (target : Server)
-  init
-    target!start
-  end
+  target!Start
 
-  branch ok from target
-    branch Value status from target
-      print status
-      close
+  branch Ok from target
+    branch Value(status) from target
+      print(status)
     end
+  or Err(e)
+    print("Server-side error when opening file: " ++ e)
   end
-
-  branch err from target
-    print "Server-side error when opening file"
-    close
-  end
+  close # Closes by default, but can be provided explicitly. Can also use `loop`.
 end
 
 fun main
   let server = spawn Server
-  spawn Client server
+  spawn Client(server)
 end
 ```
 
