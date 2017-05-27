@@ -47,8 +47,8 @@ and ('is_typed, 'is_session) expr_desc =
   | ESession of ('is_typed, session) expr list
 
 and 'is_typed session_desc =
-  | ELoop
   | EClose
+  | ELoop of ('is_typed, session) expr list option
   | ESend of identifier * string * ('is_typed, session) expr list * ('is_typed, session) expr list
   | EBranch of string * (string * string list * ('is_typed, session) expr list) list
 
@@ -114,8 +114,11 @@ let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string =
       end
     | { expr_desc = Right desc } ->
       begin match desc with
-        | ELoop -> indent_string indent "loop"
         | EClose -> indent_string indent "close"
+        | ELoop (None) -> indent_string indent "loop"
+        | ELoop (Some args) ->
+          let args = String.concat ", " (List.map (string_of_expr ~indent) args) in
+          indent_string indent ("loop(" ^ args ^ ")")
         | ESend (id, msg, args, context) ->
           indent_string indent (string_of_identifier id ^ "!" ^ msg ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")") ^ "\n" ^
           String.concat "\n" (List.map (string_of_expr ~indent) context)

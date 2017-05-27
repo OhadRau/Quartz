@@ -43,6 +43,11 @@ let rec name_and_arity : 't stmt -> string * int = function
   | { stmt_desc = SLet (name, _) } -> (name, 0)
   | { stmt_pos = (l, c) } -> raise @@ SyntaxError (l, c, "Invalid top-level declaration")
 
+let is_session = function
+  | [{ expr_desc = Left (ESession _) }]
+  | [{ expr_desc = Left (ELam (_, [{ expr_desc = Left (ESession _) }])) }] -> true
+  | _ -> false
+
 let rec emit_expr env expr =
   match expr.expr_desc with
   | Left desc ->
@@ -52,7 +57,10 @@ let rec emit_expr env expr =
       | ELiteral (String s) -> (env, "\"" ^ s ^ "\"")
       | EIdent id -> (env, prefix_identifier env id)
       | ELet (name, body, context) ->
-        let env' = { env with scope = Scope.add name `Local env.scope } in
+        let env' = { env with scope = Scope.add name `Local env.scope
+                            ; session = if is_session body
+                                          then name
+                                          else env.session } in
         let txt =
           Printf.sprintf
             {erl|
@@ -115,7 +123,7 @@ let rec emit_expr env expr =
         let txt =
           Printf.sprintf
             {erl|
-            loop = fun() ->
+            Loop = fun() ->
               %s
             end
             |erl}
@@ -124,8 +132,15 @@ let rec emit_expr env expr =
     end
   | Right desc ->
     begin match desc with
-      | ELoop -> (env, "loop()")
-      | EClose -> (env, "exit(normal)")
+      | EClose -> (env, "exit(normal)") 
+      | ELoop (None) -> (env, "Loop()")
+      | ELoop (Some args) ->
+        let fn = env.session in
+        let txt =
+          Printf.sprintf {erl|%s(%s)|erl}
+            (prefix_name env fn)
+            (emit_exprs env args) in
+        (env, txt)
       | ESend (id, msg, args, context) ->
         let prefixed = prefix_identifier env id in
         let txt =
@@ -202,12 +217,16 @@ let emit_stmt env stmt =
   | SModule (_, _) -> (env, "")
   | SLet (name, es) ->
     let (params, body, env) =
+      let env' = { env with scope = Scope.add name `Toplevel env.scope } in
       match es with
       | [{ expr_desc = Left (ELam (names, body)) }] ->
         let prefixed_names = List.map (fun s -> "Quartz_" ^ s) names in
-        let env' = { env with scope = List.fold_right (fun name scope -> Scope.add name `Local scope) names env.scope } in
-        (String.concat "," prefixed_names, emit_exprs env' body, env')
-      | es -> ("", emit_exprs env es, env) in
+        let env'' = { env' with scope = List.fold_right (fun name scope -> Scope.add name `Local scope) names env'.scope
+                            ; session = if is_session body
+                                          then name
+                                          else env'.session } in
+        (String.concat "," prefixed_names, emit_exprs env'' body, env')
+      | es -> ("", emit_exprs env' es, env') in
     let txt =
       Printf.sprintf
         {erl|
@@ -217,7 +236,7 @@ let emit_stmt env stmt =
         name
         params
         body in
-    ({ env with scope = Scope.add name `Toplevel env.scope }, txt)
+    (env, txt)
 
 let rec emit_stmts env = function
   | [] -> ""
