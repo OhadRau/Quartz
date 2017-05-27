@@ -217,7 +217,7 @@ let emit_stmt env stmt =
         name
         params
         body in
-    ({ env with scope = Scope.add name `Toplevel env.scope}, txt)
+    ({ env with scope = Scope.add name `Toplevel env.scope }, txt)
 
 let rec emit_stmts env = function
   | [] -> ""

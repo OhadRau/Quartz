@@ -12,6 +12,23 @@ Quartz is a statically typed, concurrent programming language for the BEAM VM ba
 * Structural subtyping
 * First-class functions
 
+## Roadmap
+
+- [x] AST
+- [x] Pretty Printing
+- [x] Core Compiler
+- [ ] Lexer
+- [ ] Parser
+- [ ] FFI
+- [ ] Tuples
+- [ ] Instance Variables (Mutability)
+- [ ] Comparison, arithmetic operators
+- [ ] Module Compiler
+- [ ] Type.t
+- [ ] Type Inference/Type Checking
+- [ ] Pattern Matching
+- [ ] Syntax Cleanup
+
 ## Examples
 
 ```

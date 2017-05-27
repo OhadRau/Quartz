@@ -12,4 +12,4 @@ Executable "Quartz"
   Path: src/
   MainIs: main.ml
   CompiledObject: best
-  BuildDepends: 
+  BuildDepends:
