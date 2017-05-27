@@ -9,16 +9,16 @@ type ('a, 'b) static_maybe =
 (* Static either type:
    ('a, 'b, right)  static_either = 'b
    ('a, 'b, either) static_either = ('a, 'b) result *)
-type right and either
+type left and either
 type ('a, 'b, 'c) static_either =
-  | Right : 'b -> ('a, 'b, 'c) static_either
-  | Left : 'a -> ('a, 'b, either) static_either
+  | Right : 'b -> ('a, 'b, either) static_either
+  | Left : 'a -> ('a, 'b, 'c) static_either
 
 (* Contextual names for static maybe values *)
 type typed = yes and untyped = maybe
 
 (* Contextual names for static either values *)
-type normal = either and session = right
+type normal = left and session = either
 
 type literal =
   | Number of float
@@ -50,7 +50,7 @@ and 'is_typed session_desc =
   | ELoop
   | EClose
   | ESend of identifier * string * ('is_typed, session) expr list * ('is_typed, session) expr list
-  | EBranch of string * string list * string * ('is_typed, session) expr list
+  | EBranch of string * (string * string list * ('is_typed, session) expr list) list
 
 type 'is_typed stmt =
   { stmt_desc  : 'is_typed stmt_desc
@@ -62,7 +62,7 @@ type 'is_typed stmt =
 and 'is_typed stmt_desc =
   | SOpen of identifier
   | SModule of string * 'is_typed stmt list
-  | SLet of string * ('is_typed, normal) expr list
+  | SLet of string * ('is_typed, either) expr list
 
 type 'is_typed ast =
   { ast_desc : 'is_typed stmt list
@@ -89,27 +89,27 @@ let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string =
         | ELiteral lit -> indent_string indent (string_of_literal lit)
         | EIdent id -> indent_string indent (string_of_identifier id)
         | ELet (name, body, context) ->
-          indent_string indent ("let " ^ name ^ " =\n  ") ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) body) ^ "\n" ^
+          indent_string indent ("let " ^ name ^ " =\n") ^
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
           indent_string indent "in\n" ^
           String.concat "\n" (List.map (string_of_expr ~indent) body)
         | ELam (names, body) ->
-          indent_string indent ("| " ^ String.concat ", " names ^ " |\n  ") ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) body) ^ "\n" ^
+          indent_string indent ("| " ^ String.concat ", " names ^ " |\n") ^
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
           indent_string indent "end"
         | EApp (f, args) ->
           indent_string indent (string_of_expr f ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")")
         | ECond (pred, t, f) ->
-          indent_string indent ("if " ^ string_of_expr pred ^ " then\n  ") ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) t) ^ "\n" ^
-          indent_string indent "else\n  " ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) f) ^ "\n" ^
+          indent_string indent ("if " ^ string_of_expr pred ^ " then\n") ^
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) t) ^ "\n" ^
+          indent_string indent "else\n" ^
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) f) ^ "\n" ^
           indent_string indent "end"
         | ESpawn (id, args) ->
           indent_string indent (string_of_identifier id ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")")
         | ESession body ->
-          indent_string indent "session\n  " ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) body) ^ "\n" ^
+          indent_string indent "session\n" ^
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
           indent_string indent "end"
       end
     | { expr_desc = Right desc } ->
@@ -119,10 +119,12 @@ let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string =
         | ESend (id, msg, args, context) ->
           indent_string indent (string_of_identifier id ^ "!" ^ msg ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")") ^ "\n" ^
           String.concat "\n" (List.map (string_of_expr ~indent) context)
-        | EBranch (msg, args, id, body) ->
-          indent_string indent ("branch " ^ msg ^ "(" ^ String.concat ", " args ^ ") from " ^ id) ^ "\n  " ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) body) ^ "\n" ^
-          indent_string indent "end"
+        | EBranch (id, branches) ->
+          let string_of_branch (msg, args, body) =
+            indent_string indent ("branch " ^ msg ^ "(" ^ String.concat ", " args ^ ") from " ^ id) ^ "\n" ^
+            String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
+            indent_string indent "end" in
+          String.concat "\n" @@ List.map string_of_branch branches
       end
 
 let rec string_of_stmt : type t. ?indent:int -> t stmt -> string =
@@ -132,12 +134,12 @@ let rec string_of_stmt : type t. ?indent:int -> t stmt -> string =
       begin match stmt_desc with
         | SOpen id -> indent_string indent ("open " ^ string_of_identifier id)
         | SModule (name, body) ->
-          indent_string indent ("module " ^ name ^ "\n  ") ^
-          String.concat "\n  " (List.map (string_of_stmt ~indent) body) ^ "\n" ^
+          indent_string indent ("module " ^ name ^ "\n") ^
+          String.concat "\n" (List.map (string_of_stmt ~indent:(indent+2)) body) ^ "\n" ^
           indent_string indent "end"
         | SLet (name, body) ->
-          indent_string indent ("let " ^ name ^ " =\n  ") ^
-          String.concat "\n  " (List.map (string_of_expr ~indent) body)
+          indent_string indent ("let " ^ name ^ " =\n") ^
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body)
       end
 
 let string_of_ast ?(indent=0) = function

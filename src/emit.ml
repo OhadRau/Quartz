@@ -86,16 +86,107 @@ let rec emit_expr env expr =
             (snd @@ emit_expr env fn)
             (emit_exprs env args) in
         (env, txt)
-      | ECond (pred, t, f) -> (env, "")
-      | ESpawn (id, args) -> (env, "")
-      | ESession body -> (env, "")
+      | ECond (pred, t, f) ->
+        let txt =
+          Printf.sprintf
+            {erl|
+            if
+              %s -> %s;
+              true -> %s
+            end
+            |erl}
+            (snd @@ emit_expr env pred)
+            (emit_exprs env t)
+            (emit_exprs env f) in
+        (env, txt)
+      | ESpawn (id, args) ->
+        (* FIXME: Support spawning sessions in other modules *)
+        let prefixed = prefix_identifier env id in
+        let txt =
+          Printf.sprintf
+            {erl|
+            spawn(%s, %s, [%s])
+            |erl}
+            env.module_name
+            prefixed
+            (emit_exprs env args) in
+        (env, txt)
+      | ESession body ->
+        let txt =
+          Printf.sprintf
+            {erl|
+            loop = fun() ->
+              %s
+            end
+            |erl}
+            (emit_exprs env body) in
+        (env, txt)
     end
   | Right desc ->
     begin match desc with
-      | ELoop -> (env, "")
-      | EClose -> (env, "")
-      | ESend (id, msg, args, context) -> (env, "")
-      | EBranch (msg, args, id, body) -> (env, "")
+      | ELoop -> (env, "loop()")
+      | EClose -> (env, "exit(normal)")
+      | ESend (id, msg, args, context) ->
+        let prefixed = prefix_identifier env id in
+        let txt =
+          Printf.sprintf
+            {erl|
+            %s!{%s, {%s}, self()}%s
+            %s
+            |erl}
+            prefixed
+            (prefix_name env msg)
+            (emit_exprs env args)
+            (if context = [] then "" else ",")
+            (emit_exprs env context) in
+        (env, txt)
+      | EBranch (id, branches) ->
+        begin match Scope.find id env.scope with
+          | `Local ->
+            let env' = { env with state = env.state + 1 } in
+            let emit_branch (msg, names, body) =
+              let env'' = { env' with scope = List.fold_right (fun name scope -> Scope.add name `Local scope) names env'.scope } in
+              Printf.sprintf
+                {erl|
+                {quartz_%s, {%s}, Ignore_%s} ->
+                  %s
+                |erl}
+                msg
+                (String.concat "," @@ List.map (prefix_name env) names)
+                (string_of_int env.state)
+                (emit_exprs env'' body) in
+            let txt =
+              Printf.sprintf
+                {erl|
+                receive
+                  %s
+                end
+                |erl}
+                (String.concat ";\n" @@ List.map emit_branch branches) in
+            (env', txt)
+          | `Toplevel ->
+            let env' = { env with scope = Scope.add id `Local env.scope } in
+            let emit_branch (msg, names, body) =
+              let env'' = { env' with scope = List.fold_right (fun name scope -> Scope.add name `Local scope) names env'.scope } in
+              Printf.sprintf
+                {erl|
+                {quartz_%s, {%s}, Quartz_%s} ->
+                  %s
+                |erl}
+                msg
+                (String.concat "," @@ List.map (prefix_name env) names)
+                id
+                (emit_exprs env'' body) in
+            let txt =
+              Printf.sprintf
+                {erl|
+                receive
+                  %s
+                end
+                |erl}
+                (String.concat ";\n" @@ List.map emit_branch branches) in
+            (env', txt)
+        end
     end
 
 and emit_exprs env = function
