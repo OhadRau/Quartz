@@ -37,7 +37,7 @@ let rec prefix_identifier env id =
   | Value name -> prefix_name env name
   | id -> format_identifier id
 
-let rec name_and_arity : 't stmt -> string * int = function
+let rec name_and_arity = function
   | { stmt_desc = SLet (name, [{ expr_desc = Left (ELam (args, _)) }]) } -> (name, List.length args)
   | { stmt_desc = SLet (name, _::rest) } as s -> name_and_arity { s with stmt_desc = SLet (name, rest) }
   | { stmt_desc = SLet (name, _) } -> (name, 0)
@@ -48,7 +48,8 @@ let is_session = function
   | [{ expr_desc = Left (ELam (_, [{ expr_desc = Left (ESession _) }])) }] -> true
   | _ -> false
 
-let rec emit_expr env expr =
+let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
+  = fun env expr ->
   match expr.expr_desc with
   | Left desc ->
     begin match desc with
@@ -204,7 +205,8 @@ let rec emit_expr env expr =
         end
     end
 
-and emit_exprs env = function
+and emit_exprs : type t s. env -> (t, s) expr list -> string
+  = fun env -> function
   | [] -> ""
   | [expr] -> snd (emit_expr env expr)
   | expr::exprs ->

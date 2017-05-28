@@ -1,24 +1,10 @@
-(* Static maybe type:
-   ('a, yes)   static_maybe = 'a
-   ('a, maybe) static_maybe = 'a option *)
-type yes and maybe
 type ('a, 'b) static_maybe =
-  | Just : 'a -> ('a, 'b) static_maybe
-  | Nothing : ('a, maybe) static_maybe
+  | Just : 'a -> ('a, [> `Yes]) static_maybe
+  | Nothing : ('a, [> `No]) static_maybe
 
-(* Static either type:
-   ('a, 'b, right)  static_either = 'b
-   ('a, 'b, either) static_either = ('a, 'b) result *)
-type left and either
 type ('a, 'b, 'c) static_either =
-  | Right : 'b -> ('a, 'b, either) static_either
-  | Left : 'a -> ('a, 'b, 'c) static_either
-
-(* Contextual names for static maybe values *)
-type typed = yes and untyped = maybe
-
-(* Contextual names for static either values *)
-type normal = left and session = either
+  | Right : 'b -> ('a, 'b, [> `Right]) static_either
+  | Left : 'a -> ('a, 'b, [> `Left]) static_either
 
 type literal =
   | Number of float
@@ -44,13 +30,13 @@ and ('is_typed, 'is_session) expr_desc =
   | EApp of ('is_typed, 'is_session) expr * ('is_typed, 'is_session) expr list
   | ECond of ('is_typed, 'is_session) expr * ('is_typed, 'is_session) expr list * ('is_typed, 'is_session) expr list
   | ESpawn of identifier * ('is_typed, 'is_session) expr list
-  | ESession of ('is_typed, session) expr list
+  | ESession of ('is_typed, [`Left | `Right]) expr list
 
 and 'is_typed session_desc =
   | EClose
-  | ELoop of ('is_typed, session) expr list option
-  | ESend of identifier * string * ('is_typed, session) expr list * ('is_typed, session) expr list
-  | EBranch of string * (string * string list * ('is_typed, session) expr list) list
+  | ELoop of ('is_typed, [`Left | `Right]) expr list option
+  | ESend of identifier * string * ('is_typed, [`Left | `Right]) expr list * ('is_typed, [`Left | `Right]) expr list
+  | EBranch of string * (string * string list * ('is_typed, [`Left | `Right]) expr list) list
 
 type 'is_typed stmt =
   { stmt_desc  : 'is_typed stmt_desc
@@ -62,7 +48,7 @@ type 'is_typed stmt =
 and 'is_typed stmt_desc =
   | SOpen of identifier
   | SModule of string * 'is_typed stmt list
-  | SLet of string * ('is_typed, either) expr list
+  | SLet of string * ('is_typed, [`Left]) expr list
 
 type 'is_typed ast =
   { ast_desc : 'is_typed stmt list
@@ -81,8 +67,8 @@ let rec string_of_identifier = function
   | Value s -> s
   | Qualify (s, id) -> s ^ "." ^ string_of_identifier id
 
-let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string =
-  fun ?(indent=0) -> function
+let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string
+  = fun ?(indent=0) -> function
     | { expr_src = Some txt } -> txt
     | { expr_desc = Left desc } ->
       begin match desc with
@@ -130,8 +116,7 @@ let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string =
           String.concat "\n" @@ List.map string_of_branch branches
       end
 
-let rec string_of_stmt : type t. ?indent:int -> t stmt -> string =
-  fun ?(indent=0) -> function
+let rec string_of_stmt ?(indent=0) = function
     | { stmt_src = Some txt } -> txt
     | { stmt_desc } ->
       begin match stmt_desc with

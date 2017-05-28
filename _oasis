@@ -13,3 +13,4 @@ Executable "Quartz"
   MainIs: main.ml
   CompiledObject: best
   BuildDepends:
+  BuildTools+: menhir, ocamllex
