@@ -8,6 +8,15 @@ OASISFormat: 0.4
 BuildTools: ocamlbuild
 Plugins: META (0.4), DevFiles (0.4)
 
+AlphaFeatures:
+  ocamlbuild_more_args
+
+XOCamlbuildExtraArgs:
+  -use-menhir
+  -yaccflag --unused-tokens
+#  -yaccflag --list-errors
+  -yaccflag --trace
+
 Executable "Quartz"
   Path: src/
   MainIs: main.ml

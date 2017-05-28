@@ -1,6 +1,7 @@
 open Ast
+open Pos
 
-exception SyntaxError of int * int * string
+exception SyntaxError of string
 
 module Scope = Map.Make (String)
 
@@ -41,7 +42,7 @@ let rec name_and_arity = function
   | { stmt_desc = SLet (name, [{ expr_desc = Left (ELam (args, _)) }]) } -> (name, List.length args)
   | { stmt_desc = SLet (name, _::rest) } as s -> name_and_arity { s with stmt_desc = SLet (name, rest) }
   | { stmt_desc = SLet (name, _) } -> (name, 0)
-  | { stmt_pos = (l, c) } -> raise @@ SyntaxError (l, c, "Invalid top-level declaration")
+  | { stmt_pos } -> raise @@ SyntaxError ("Invalid top-level declaration on " ^ string_of_pos stmt_pos)
 
 let is_session = function
   | [{ expr_desc = Left (ESession _) }]
