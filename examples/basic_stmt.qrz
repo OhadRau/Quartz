@@ -1,0 +1,11 @@
+module Examples
+  require Prelude # Imports some stuff
+
+  session Client(server)
+    server
+  end
+
+  fun main()
+    foreach
+  end
+end

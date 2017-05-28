@@ -1,0 +1,21 @@
+module Examples
+  require Prelude # Imports some stuff
+
+  session Client(server)
+    server!Hello
+    on Ready(my_id) from server
+      server!Log(my_id, "What's up?")
+      close
+    or Busy
+      print("Server busy, retrying in 10s")
+      wait(10)
+      loop
+    end
+  end
+
+  fun main()
+    foreach(args, |arg|
+      print(arg)
+    end)
+  end
+end
