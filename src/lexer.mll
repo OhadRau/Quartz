@@ -21,6 +21,13 @@ let keyword_table =
     ; "spawn",   SPAWN
     ];
   hash
+
+let update_loc lexbuf =
+  let pos = lexbuf.lex_curr_p in
+  lexbuf.lex_curr_p <-
+    { pos with pos_lnum = pos.pos_lnum + 1
+             ; pos_bol = 0
+             }
 }
 
 let ident_start = ['A'-'Z' 'a'-'z' '_']
@@ -32,7 +39,7 @@ rule token = parse
   | [' ' '\t' '\r']
     { token lexbuf }
   | ['\n' ';']
-    { NEWLINE }
+    { update_loc lexbuf; NEWLINE }
   | '#'
     { comment lexbuf }
   | '"'
@@ -54,7 +61,7 @@ rule token = parse
   | "<-"
     { ASSIGN }
   | digit+ as f | (digit* '.' digit+) as f
-    { NUMBER (string_of_float f) }
+    { NUMBER (float_of_string f) }
   | (ident_start ident_chars*) as id
     { if Hashtbl.mem keyword_table id
         then Hashtbl.find keyword_table id
@@ -74,8 +81,10 @@ and string_literal strbuf = parse
   | eof
     { EOF }
   | "\\\"" as q
-    { string_literal (Buffer.add_string strbuf q) lexbuf }
+    { Buffer.add_string strbuf q;
+      string_literal strbuf lexbuf }
   | '"'
-    { STRING (Buffer.contents strbuf |> String.unescaped) }
+    { STRING (Buffer.contents strbuf |> Scanf.unescaped) }
   | _ as c
-    { string_literal (Buffer.add_char strbuf c) lexbuf }
+    { Buffer.add_char strbuf c;
+      string_literal strbuf lexbuf }

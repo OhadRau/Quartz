@@ -1,3 +1,5 @@
+open Pos
+
 type ('a, 'b) static_maybe =
   | Just : 'a -> ('a, [> `Yes]) static_maybe
   | Nothing : ('a, [> `No]) static_maybe
@@ -17,8 +19,8 @@ type identifier =
 
 type ('is_typed, 'is_session) expr =
   { expr_desc  : (('is_typed, 'is_session) expr_desc, 'is_typed session_desc, 'is_session) static_either
-  ; expr_type_ : (Type.t, 'is_typed) static_maybe
-  ; expr_pos   : (int * int)
+  ; expr_type : (Type.t, 'is_typed) static_maybe
+  ; expr_pos   : pos
   ; expr_src   : string option
   }
 
@@ -40,8 +42,8 @@ and 'is_typed session_desc =
 
 type 'is_typed stmt =
   { stmt_desc  : 'is_typed stmt_desc
-  ; stmt_type_ : (Type.t, 'is_typed) static_maybe
-  ; stmt_pos   : (int * int)
+  ; stmt_type : (Type.t, 'is_typed) static_maybe
+  ; stmt_pos   : pos
   ; stmt_src   : string option
   }
 
@@ -53,6 +55,7 @@ and 'is_typed stmt_desc =
 type 'is_typed ast =
   { ast_desc : 'is_typed stmt list
   ; ast_src  : string option
+  ; ast_pos  : pos
   }
 
 let indent_string n str =
