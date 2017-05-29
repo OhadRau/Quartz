@@ -30,9 +30,9 @@ let mk_sesh desc pos =
   }
 %}
 
-%token AT ASSIGN CLOSE CLOSE_PAREN COMMA ELSE END EOF EQUALS FROM FUN IF LET LOOP MODULE NEWLINE ON OPEN_PAREN OR PIPE REQUIRE SEND SESSION SPAWN
+%token AT ASSIGN CLOSE CLOSE_PAREN COMMA ELSE END EOF EQUALS FROM FUN IF LET LOOP MODULE DELIMIT ON OPEN_PAREN OR PIPE REQUIRE SEND SESSION SPAWN
 %token <string> IDENT STRING
-%token <float> NUMBER
+%token <int * int> NUMBER
 
 %start ast
 %type <[`No] Ast.ast> ast
@@ -40,61 +40,55 @@ let mk_sesh desc pos =
 %%
 
 ast:
-  | stmts NEWLINE* EOF
+  | stmts EOF
     { mk_ast $1 (mk_pos $startpos) }
-  | NEWLINE* EOF
-    { mk_ast [] (mk_pos $startpos) }
 ;
 
 stmts:
-  | stmt
+  | stmt DELIMIT
     { [$1] }
-  | stmt NEWLINE+ stmts
+  | stmt DELIMIT stmts
     { $1::$3 }
 ;
 
 stmt:
   | REQUIRE IDENT
     { mk_stmt (SOpen (Value $2)) (mk_pos $startpos) }
-  | MODULE IDENT NEWLINE+ stmts NEWLINE+ END
+  | MODULE IDENT DELIMIT stmts END
     { mk_stmt (SModule ($2, $4)) (mk_pos $startpos) }
-  | LET IDENT EQUALS NEWLINE* exprs
+  | LET IDENT EQUALS DELIMIT? exprs
     { mk_stmt (SLet ($2, $5)) (mk_pos $startpos) }
-  | FUN IDENT OPEN_PAREN params CLOSE_PAREN NEWLINE+ exprs NEWLINE+ END
+  | FUN IDENT OPEN_PAREN params CLOSE_PAREN DELIMIT exprs END
     { let lam = mk_expr (ELam ($4, $7)) (mk_pos $startpos) in
       mk_stmt (SLet ($2, [lam])) (mk_pos $startpos) }
-  | SESSION IDENT OPEN_PAREN params CLOSE_PAREN NEWLINE+ sessions NEWLINE+ END
+  | SESSION IDENT OPEN_PAREN params CLOSE_PAREN DELIMIT sessions END
     { let sesh = mk_expr (ESession $7) (mk_pos $startpos) in
       let lam = mk_expr (ELam ($4, [sesh])) (mk_pos $startpos) in
       mk_stmt (SLet ($2, [lam])) (mk_pos $startpos) }
 ;
 
 params:
-  |
-    { [] }
-  | IDENT
-    { [$1] }
-  | IDENT COMMA params
-    { $1::$3 }
+  | separated_list(COMMA, IDENT)
+    { $1 }
 ;
 
 exprs:
-  | expr
+  | expr DELIMIT
     { [$1] }
-  | expr NEWLINE+ exprs
+  | expr DELIMIT exprs
     { $1::$3 }
 ;
 
 sessions:
-  | session
+  | session DELIMIT
     { [$1] }
-  | session NEWLINE+ sessions
+  | session DELIMIT sessions
     { $1::$3 }
 ;
 
 expr:
   | IDENT
-    { mk_expr (ELiteral (Number 0.0)) (mk_pos $startpos) }
+    { mk_expr (ELiteral (Number (0, 0))) (mk_pos $startpos) }
 ;
 
 session:

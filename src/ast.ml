@@ -9,7 +9,7 @@ type ('a, 'b, 'c) static_either =
   | Left : 'a -> ('a, 'b, [> `Left]) static_either
 
 type literal =
-  | Number of float
+  | Number of (int * int)
   | Bool of bool
   | String of string
 
@@ -62,7 +62,7 @@ let indent_string n str =
   String.make n ' ' ^ str
 
 let string_of_literal = function
-  | Number n -> string_of_float n
+  | Number (n1, n2) -> string_of_int n1 ^ "." ^ string_of_int n2
   | Bool b -> string_of_bool b
   | String s -> s
 

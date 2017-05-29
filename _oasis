@@ -15,7 +15,9 @@ XOCamlbuildExtraArgs:
   -use-menhir
   -yaccflag --unused-tokens
 #  -yaccflag --list-errors
-  -yaccflag --trace
+#  -yaccflag --interpret
+#  -yaccflag --interpret-show-cst
+#  -yaccflag --trace
 
 Executable "Quartz"
   Path: src/

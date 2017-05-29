@@ -54,7 +54,7 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
   match expr.expr_desc with
   | Left desc ->
     begin match desc with
-      | ELiteral (Number n) -> (env, string_of_float n)
+      | ELiteral (Number (n1, n2)) -> (env, string_of_int n1 ^ "." ^ string_of_int n2)
       | ELiteral (Bool b) -> (env, string_of_bool b)
       | ELiteral (String s) -> (env, "\"" ^ s ^ "\"")
       | EIdent id -> (env, prefix_identifier env id)
@@ -214,10 +214,12 @@ and emit_exprs : type t s. env -> (t, s) expr list -> string
     let (env', txt) = emit_expr env expr in
     txt ^ ",\n" ^ emit_exprs env' exprs
 
-let emit_stmt env stmt =
+let rec emit_stmt env stmt =
   match stmt.stmt_desc with
   | SOpen _ -> (env, "")
-  | SModule (_, _) -> (env, "")
+  | SModule (name, body) ->
+    let env' = { env with module_name = name } in
+    (env', emit_stmts env' body)
   | SLet (name, es) ->
     let (params, body, env) =
       let env' = { env with scope = Scope.add name `Toplevel env.scope } in
@@ -241,7 +243,7 @@ let emit_stmt env stmt =
         body in
     (env, txt)
 
-let rec emit_stmts env = function
+and emit_stmts env = function
   | [] -> ""
   | stmt::stmts ->
     let (env', txt) = emit_stmt env stmt in
