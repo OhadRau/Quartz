@@ -1,0 +1,14 @@
+let x = 5.7
+let y = |a, b|
+  let z = add(a, b)
+  print("Test")
+  print_num(z)
+end
+
+fun main(args)
+  if greater_than(length(args), 0)
+    do_thing(true, x, args)
+  else
+    spawn M(1, 2, 3)
+  end
+end

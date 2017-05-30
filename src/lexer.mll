@@ -8,6 +8,7 @@ let keyword_table =
     [ "close",   CLOSE
     ; "else",    ELSE
     ; "end",     END
+    ; "false",   FALSE
     ; "from",    FROM
     ; "fun",     FUN
     ; "if",      IF
@@ -19,6 +20,7 @@ let keyword_table =
     ; "require", REQUIRE
     ; "session", SESSION
     ; "spawn",   SPAWN
+    ; "true",    TRUE
     ];
   hash
 }

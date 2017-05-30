@@ -30,7 +30,7 @@ let mk_sesh desc pos =
   }
 %}
 
-%token AT ASSIGN CLOSE CLOSE_PAREN COMMA ELSE END EOF EQUALS FROM FUN IF LET LOOP MODULE DELIMIT ON OPEN_PAREN OR PIPE REQUIRE SEND SESSION SPAWN
+%token AT ASSIGN CLOSE CLOSE_PAREN COMMA ELSE END EOF EQUALS FALSE FROM FUN IF LET LOOP MODULE DELIMIT ON OPEN_PAREN OR PIPE REQUIRE SEND SESSION SPAWN TRUE
 %token <string> IDENT STRING
 %token <int * int> NUMBER
 
@@ -56,7 +56,9 @@ stmt:
     { mk_stmt (SOpen (Value $2)) (mk_pos $startpos) }
   | MODULE IDENT DELIMIT stmts END
     { mk_stmt (SModule ($2, $4)) (mk_pos $startpos) }
-  | LET IDENT EQUALS DELIMIT? exprs
+  | LET IDENT EQUALS expr
+    { mk_stmt (SLet ($2, [$4])) (mk_pos $startpos) }
+  | LET IDENT EQUALS DELIMIT exprs END
     { mk_stmt (SLet ($2, $5)) (mk_pos $startpos) }
   | FUN IDENT OPEN_PAREN params CLOSE_PAREN DELIMIT exprs END
     { let lam = mk_expr (ELam ($4, $7)) (mk_pos $startpos) in
@@ -75,7 +77,7 @@ params:
 exprs:
   | expr DELIMIT
     { [$1] }
-  | expr DELIMIT exprs
+  | expr DELIMIT exprs DELIMIT
     { $1::$3 }
 ;
 
@@ -87,8 +89,32 @@ sessions:
 ;
 
 expr:
+  | NUMBER
+    { mk_expr (ELiteral (Number $1)) (mk_pos $startpos) }
+  | TRUE
+    { mk_expr (ELiteral (Bool true)) (mk_pos $startpos) }
+  | FALSE
+    { mk_expr (ELiteral (Bool false)) (mk_pos $startpos) }
+  | STRING
+    { mk_expr (ELiteral (String $1)) (mk_pos $startpos) }
   | IDENT
-    { mk_expr (ELiteral (Number (0, 0))) (mk_pos $startpos) }
+    { mk_expr (EIdent (Value $1)) (mk_pos $startpos) }
+  | LET IDENT EQUALS expr DELIMIT exprs
+    { mk_expr (ELet ($2, [$4], $6)) (mk_pos $startpos) }
+  | LET IDENT EQUALS DELIMIT exprs END DELIMIT exprs
+    { mk_expr (ELet ($2, $5, $8)) (mk_pos $startpos) }
+  | PIPE params PIPE expr
+    { mk_expr (ELam ($2, [$4])) (mk_pos $startpos) }
+  | PIPE params PIPE DELIMIT exprs END
+    { mk_expr (ELam ($2, $5)) (mk_pos $startpos) }
+  | expr OPEN_PAREN separated_list(COMMA, expr) CLOSE_PAREN
+    { mk_expr (EApp ($1, $3)) (mk_pos $startpos) }
+  | IF expr DELIMIT exprs ELSE DELIMIT exprs END
+    { mk_expr (ECond ($2, $4, $7)) (mk_pos $startpos) }
+  | SPAWN IDENT OPEN_PAREN separated_list(COMMA, expr) CLOSE_PAREN
+    { mk_expr (ESpawn (Value $2, $4)) (mk_pos $startpos) }
+  /* No rule for parsing sessions, since anonymous sessions
+     are not yet supported */
 ;
 
 session:
