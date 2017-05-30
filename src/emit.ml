@@ -20,7 +20,7 @@ let prefix_name env name =
   match Scope.find name env.scope with
   | `Toplevel ->
     let id = "quartz_" ^ name in
-    begin match List.assoc id env.exports with
+    begin match List.assoc name env.exports with
       | 0 -> id ^ "()"
       | n -> id
       | exception Not_found -> id

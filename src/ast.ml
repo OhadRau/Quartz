@@ -64,7 +64,7 @@ let indent_string n str =
 let string_of_literal = function
   | Number (n1, n2) -> string_of_int n1 ^ "." ^ string_of_int n2
   | Bool b -> string_of_bool b
-  | String s -> s
+  | String s -> "\"" ^ s ^ "\""
 
 let rec string_of_identifier = function
   | Value s -> s
@@ -80,8 +80,8 @@ let rec string_of_expr : type t s. ?indent:int -> (t, s) expr -> string
         | ELet (name, body, context) ->
           indent_string indent ("let " ^ name ^ " =\n") ^
           String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
-          indent_string indent "in\n" ^
-          String.concat "\n" (List.map (string_of_expr ~indent) body)
+          indent_string indent "end\n" ^
+          String.concat "\n" (List.map (string_of_expr ~indent) context)
         | ELam (names, body) ->
           indent_string indent ("| " ^ String.concat ", " names ^ " |\n") ^
           String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
@@ -130,7 +130,8 @@ let rec string_of_stmt ?(indent=0) = function
           indent_string indent "end"
         | SLet (name, body) ->
           indent_string indent ("let " ^ name ^ " =\n") ^
-          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body)
+          String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
+          indent_string indent "end"
       end
 
 let string_of_ast ?(indent=0) = function
