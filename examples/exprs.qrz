@@ -1,8 +1,10 @@
 let x = 5.7
-let y = |a, b|
-  let z = add(a, b)
-  print("Test")
-  print_num(z)
+let y =
+  |a, b|
+    let z = add(a, b)
+    print("Test")
+    print_num(z)
+  end
 end
 
 fun main(args)

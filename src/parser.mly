@@ -34,6 +34,9 @@ let mk_sesh desc pos =
 %token <string> IDENT STRING
 %token <int * int> NUMBER
 
+%nonassoc below_DELIMIT
+%nonassoc DELIMIT
+
 %start ast
 %type <[`No] Ast.ast> ast
 
@@ -75,13 +78,17 @@ params:
 ;
 
 exprs:
+  | expr %prec below_DELIMIT
+    { [$1] }
   | expr DELIMIT
     { [$1] }
-  | expr DELIMIT exprs DELIMIT
+  | expr DELIMIT exprs
     { $1::$3 }
 ;
 
 sessions:
+  | session %prec below_DELIMIT
+    { [$1] }
   | session DELIMIT
     { [$1] }
   | session DELIMIT sessions
@@ -103,6 +110,13 @@ expr:
     { mk_expr (ELet ($2, [$4], $6)) (mk_pos $startpos) }
   | LET IDENT EQUALS DELIMIT exprs END DELIMIT exprs
     { mk_expr (ELet ($2, $5, $8)) (mk_pos $startpos) }
+  | FUN IDENT OPEN_PAREN params CLOSE_PAREN DELIMIT exprs END DELIMIT exprs
+    { let lam = mk_expr (ELam ($4, $7)) (mk_pos $startpos) in
+      mk_expr (ELet ($2, [lam], $10)) (mk_pos $startpos) }
+  | SESSION IDENT OPEN_PAREN params CLOSE_PAREN DELIMIT sessions END DELIMIT exprs
+    { let sesh = mk_expr (ESession $7) (mk_pos $startpos) in
+      let lam = mk_expr (ELam ($4, [sesh])) (mk_pos $startpos) in
+      mk_expr (ELet ($2, [lam], $10)) (mk_pos $startpos) }
   | PIPE params PIPE expr
     { mk_expr (ELam ($2, [$4])) (mk_pos $startpos) }
   | PIPE params PIPE DELIMIT exprs END
