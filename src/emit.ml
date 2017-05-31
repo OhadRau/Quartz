@@ -125,9 +125,10 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
         let txt =
           Printf.sprintf
             {erl|
-            Loop = fun() ->
+            Loop = fun(Loop) ->
               %s
-            end
+            end,
+            Loop(Loop)
             |erl}
             (emit_exprs env body) in
         (env, txt)
@@ -135,7 +136,7 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
   | Right desc ->
     begin match desc with
       | EClose -> (env, "exit(normal)") 
-      | ELoop (None) -> (env, "Loop()")
+      | ELoop (None) -> (env, "Loop(Loop)")
       | ELoop (Some args) ->
         let fn = env.session in
         let txt =
