@@ -13,4 +13,8 @@ fun main(args)
   else
     spawn M(1, 2, 3)
   end
+  foreach(args, |arg| print(arg))
+  foreach(args, |arg|
+    print(arg)
+  end)
 end
