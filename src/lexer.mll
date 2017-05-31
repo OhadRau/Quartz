@@ -33,8 +33,10 @@ let digit = ['0'-'9']
 rule token = parse
   | [' ' '\t' '\r']
     { token lexbuf }
-  | '\n'+
-    { new_line lexbuf; DELIMIT }
+  | '\n'+ as ns
+    { for i = 0 to String.length ns do
+        new_line lexbuf
+      done; DELIMIT }
   | ';'
     { DELIMIT }
   | '#'
@@ -49,14 +51,10 @@ rule token = parse
     { COMMA }
   | '|'
     { PIPE }
-  | '@'
-    { AT }
   | '!'
     { SEND }
   | '='
     { EQUALS }
-  | "<-"
-    { ASSIGN }
   | digit+ as i
     { NUMBER (int_of_string i, 0) }
   | (digit* as i1) '.' (digit+ as i2)
@@ -69,8 +67,15 @@ rule token = parse
     { EOF }
 
 and comment = parse
-  | '\n'
-    { new_line lexbuf; token lexbuf }
+  (* TODO: Test more examples, as this
+     may require a more robust solution *)
+  | '\n' ['\r' '\t' ' ']* '#'
+    { new_line lexbuf; comment lexbuf }
+  | '\n'+ as ns
+    { let times = String.length ns in
+      for i = 1 to times do
+        new_line lexbuf
+      done; DELIMIT }
   | eof
     { EOF }
   | _
