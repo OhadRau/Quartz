@@ -30,7 +30,7 @@ let mk_sesh desc pos =
   }
 %}
 
-%token AT ASSIGN CLOSE CLOSE_PAREN COMMA ELSE END EOF EQUALS FALSE FROM FUN IF LET LOOP MODULE DELIMIT ON OPEN_PAREN OR PIPE REQUIRE SEND SESSION SPAWN TRUE
+%token CLOSE CLOSE_PAREN COMMA ELSE END EOF EQUALS FALSE FROM FUN IF LET LOOP MODULE DELIMIT ON OPEN_PAREN OR PIPE REQUIRE SEND SESSION SPAWN TRUE
 %token <string> IDENT STRING
 %token <int * int> NUMBER
 
@@ -134,4 +134,27 @@ expr:
 session:
   | expr
     { Obj.magic $1 }
+  |  CLOSE
+    { mk_sesh EClose (mk_pos $startpos) }
+  | LOOP
+    { mk_sesh (ELoop None) (mk_pos $startpos) }
+  | LOOP OPEN_PAREN separated_list(COMMA, session) CLOSE_PAREN
+    { mk_sesh (ELoop (Some $3)) (mk_pos $startpos) }
+  | IDENT SEND IDENT DELIMIT sessions
+    { mk_sesh (ESend (Value $1, $3, [], $5)) (mk_pos $startpos) }
+  | IDENT SEND IDENT OPEN_PAREN separated_list(COMMA, session) CLOSE_PAREN DELIMIT sessions
+    { mk_sesh (ESend (Value $1, $3, $5, $8)) (mk_pos $startpos) }
+  | ON IDENT FROM IDENT DELIMIT sessions or_branches
+    { mk_sesh (EBranch ($4, ($2, [], $6)::$7)) (mk_pos $startpos) }
+  | ON IDENT OPEN_PAREN separated_list(COMMA, IDENT) CLOSE_PAREN FROM IDENT DELIMIT sessions or_branches
+    { mk_sesh (EBranch ($7, ($2, $4, $9)::$10)) (mk_pos $startpos) }
+;
+
+or_branches:
+  | END
+    { [] }
+  | OR IDENT DELIMIT sessions or_branches
+    { ($2, [], $4)::$5 }
+  | OR IDENT OPEN_PAREN separated_list(COMMA, IDENT) CLOSE_PAREN DELIMIT sessions or_branches
+    { ($2, $4, $7)::$8 }
 ;

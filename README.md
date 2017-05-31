@@ -18,7 +18,7 @@ Quartz is a statically typed, concurrent programming language for the BEAM VM ba
 - [x] Pretty Printing
 - [x] Core Compiler
 - [X] Lexer
-- [ ] Parser
+- [X] Parser
 - [ ] FFI
 - [ ] Tuples
 - [ ] Instance Variables (Mutability)
