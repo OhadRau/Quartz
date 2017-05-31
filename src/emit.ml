@@ -170,7 +170,7 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
                   %s
                 |erl}
                 msg
-                (String.concat "," @@ List.map (prefix_name env) names)
+                (String.concat "," @@ List.map (fun name -> "Quartz_" ^ name) names)
                 (string_of_int env.state)
                 (emit_exprs env'' body) in
             let txt =
@@ -192,7 +192,7 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
                   %s
                 |erl}
                 msg
-                (String.concat "," @@ List.map (prefix_name env) names)
+                (String.concat "," @@ List.map (fun name -> "Quartz_" ^ name) names)
                 id
                 (emit_exprs env'' body) in
             let txt =
