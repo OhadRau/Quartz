@@ -21,5 +21,9 @@ setup.log
 # causes problems when switching compiler versions
 setup.ml
 
+# compiler generated files
+examples/*.erl
+examples/*.beam
+
 # project specific files
 spec/

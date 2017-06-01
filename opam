@@ -14,4 +14,5 @@ remove: ["ocamlfind" "remove" "Quartz"]
 depends: [
   "ocamlfind" {build}
   "oasis" {build}
+  "menhir"
 ]
