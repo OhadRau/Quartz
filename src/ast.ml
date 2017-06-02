@@ -48,8 +48,9 @@ type 'is_typed stmt =
   }
 
 and 'is_typed stmt_desc =
-  | SOpen of identifier
+  | SRequire of identifier
   | SModule of string * 'is_typed stmt list
+  | SFfi of string * Type.t * string
   | SLet of string * ('is_typed, [`Left]) expr list
 
 type 'is_typed ast =
@@ -123,7 +124,7 @@ let rec string_of_stmt ?(indent=0) = function
     | { stmt_src = Some txt } -> txt
     | { stmt_desc } ->
       begin match stmt_desc with
-        | SOpen id -> indent_string indent ("open " ^ string_of_identifier id)
+        | SRequire id -> indent_string indent ("open " ^ string_of_identifier id)
         | SModule (name, body) ->
           indent_string indent ("module " ^ name ^ "\n") ^
           String.concat "\n" (List.map (string_of_stmt ~indent:(indent+2)) body) ^ "\n" ^
@@ -132,6 +133,8 @@ let rec string_of_stmt ?(indent=0) = function
           indent_string indent ("let " ^ name ^ " =\n") ^
           String.concat "\n" (List.map (string_of_expr ~indent:(indent+2)) body) ^ "\n" ^
           indent_string indent "end"
+        | SFfi (name, t, erl_name) ->
+          indent_string indent ("ffi " ^ name ^ " : " ^ Type.string_of_type t ^ " = " ^ erl_name)
       end
 
 let string_of_ast ?(indent=0) = function

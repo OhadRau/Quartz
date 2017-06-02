@@ -56,7 +56,7 @@ stmts:
 
 stmt:
   | REQUIRE IDENT
-    { mk_stmt (SOpen (Value $2)) (mk_pos $startpos) }
+    { mk_stmt (SRequire (Value $2)) (mk_pos $startpos) }
   | MODULE IDENT DELIMIT stmts END
     { mk_stmt (SModule ($2, $4)) (mk_pos $startpos) }
   | LET IDENT EQUALS expr

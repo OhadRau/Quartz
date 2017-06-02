@@ -8,22 +8,27 @@ module Scope = Map.Make (String)
 type env =
   { module_name : string
   ; exports : (string * int) list
+  ; ffi : string Scope.t
   ; scope : [ `Toplevel | `Local ] Scope.t
   ; session : string
   ; state : int
   }
 
 let make_env module_name =
-  { module_name; exports = []; scope = Scope.empty; session = ""; state = 0 }
+  { module_name; exports = []; scope = Scope.empty; ffi = Scope.empty; session = ""; state = 0 }
 
 let prefix_name env name =
   match Scope.find name env.scope with
   | `Toplevel ->
     let id = "quartz_" ^ name in
-    begin match List.assoc name env.exports with
-      | 0 -> id ^ "()"
-      | n -> id
-      | exception Not_found -> id
+    begin match Scope.find name env.ffi with
+      | erl_name -> erl_name
+      | exception Not_found ->
+        begin match List.assoc name env.exports with
+          | 0 -> id ^ "()"
+          | n -> id
+          | exception Not_found -> id
+        end
     end
   | `Local -> "Quartz_" ^ name
   | exception Not_found -> "quartz_" ^ name (* Symbol if no ID found? *)
@@ -149,11 +154,11 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
         let txt =
           Printf.sprintf
             {erl|
-            %s!{%s, {%s}, self()}%s
+            %s!{quartz_%s, {%s}, self()}%s
             %s
             |erl}
             prefixed
-            (prefix_name env msg)
+            msg
             (emit_exprs env args)
             (if context = [] then "" else ",")
             (emit_exprs env context) in
@@ -217,7 +222,7 @@ and emit_exprs : type t s. env -> (t, s) expr list -> string
 
 let rec emit_stmt env stmt =
   match stmt.stmt_desc with
-  | SOpen _ -> (env, "")
+  | SRequire _ -> (env, "")
   | SModule (name, body) ->
     let env' = { env with module_name = name } in
     (env', emit_stmts env' body)
@@ -243,6 +248,9 @@ let rec emit_stmt env stmt =
         params
         body in
     (env, txt)
+  | SFfi (name, _, erl_name) ->
+    ({ env with scope = Scope.add name `Toplevel env.scope
+              ; ffi = Scope.add name erl_name env.ffi }, "")
 
 and emit_stmts env = function
   | [] -> ""
