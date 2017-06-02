@@ -8,29 +8,25 @@ module Scope = Map.Make (String)
 type env =
   { module_name : string
   ; exports : (string * int) list
-  ; ffi : string Scope.t
-  ; scope : [ `Toplevel | `Local ] Scope.t
+  ; scope : [ `Toplevel | `Local | `Ffi of string ] Scope.t
   ; session : string
   ; state : int
   }
 
 let make_env module_name =
-  { module_name; exports = []; scope = Scope.empty; ffi = Scope.empty; session = ""; state = 0 }
+  { module_name; exports = []; scope = Scope.empty; session = ""; state = 0 }
 
 let prefix_name env name =
   match Scope.find name env.scope with
   | `Toplevel ->
     let id = "quartz_" ^ name in
-    begin match Scope.find name env.ffi with
-      | erl_name -> erl_name
-      | exception Not_found ->
-        begin match List.assoc name env.exports with
-          | 0 -> id ^ "()"
-          | n -> id
-          | exception Not_found -> id
-        end
+    begin match List.assoc name env.exports with
+      | 0 -> id ^ "()"
+      | n -> id
+      | exception Not_found -> id
     end
   | `Local -> "Quartz_" ^ name
+  | `Ffi erl_name -> erl_name
   | exception Not_found -> "quartz_" ^ name (* Symbol if no ID found? *)
 
 (* FIXME: Should check for arity 0 with imported symbols *)
@@ -187,7 +183,7 @@ let rec emit_expr : type t s. env -> (t, s) expr -> (env * string)
                 |erl}
                 (String.concat ";\n" @@ List.map emit_branch branches) in
             (env', txt)
-          | `Toplevel ->
+          | `Toplevel | `Ffi _ ->
             let env' = { env with scope = Scope.add id `Local env.scope } in
             let emit_branch (msg, names, body) =
               let env'' = { env' with scope = List.fold_right (fun name scope -> Scope.add name `Local scope) names env'.scope } in
@@ -249,8 +245,7 @@ let rec emit_stmt env stmt =
         body in
     (env, txt)
   | SFfi (name, _, erl_name) ->
-    ({ env with scope = Scope.add name `Toplevel env.scope
-              ; ffi = Scope.add name erl_name env.ffi }, "")
+    ({ env with scope = Scope.add name (`Ffi erl_name) env.scope }, "")
 
 and emit_stmts env = function
   | [] -> ""
