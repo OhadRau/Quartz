@@ -33,3 +33,28 @@ let rec apply env = function
   | TOffer (w, offers) -> TOffer (w, List.map (fun (n, p, c) -> (n, apply env p, apply env c)) offers)
   | TChoose (w, offers) -> TChoose (w, List.map (fun (n, p, c) -> (n, apply env p, apply env c)) offers)
   | TQuant (q, l, t) -> TQuant (q, l, apply env t)
+
+let rec contains(t2) = function
+  | TApp (_, xs) -> List.exists (contains(t2)) xs
+  | TArrow (a, b) -> List.exists (contains(t2)) a || contains(t2) b
+  | TImplicit (_, a, b) -> contains(t2) a || contains(t2) b
+  | TNamed (_, t) -> contains(t2) t
+  | TRec (_, t) -> contains(t2) t
+  | TOffer (_, offers) | TChoose (_, offers) -> List.exists (fun (_, p, c) -> contains(t2) p || contains(t2) c) offers
+  | TQuant (_, _, t) -> contains(t2) t
+  | t1 -> t1 = t2
+
+let rec unify env t1 t2 =
+  let t1 = apply env t1 and t2 = apply env t2 in
+  match t1, t2 with
+  | _, _ when t1 = t2 -> env
+  | TVar _, _ when not (contains(t2) t1) -> { env with subst = Subst.add t1 t2 env.subst }
+  | _, TVar _ when not (contains(t1) t2) -> { env with subst = Subst.add t2 t1 env.subst }
+  | TApp (f, xs), TApp (g, ys) when f = g -> List.fold_left2 unify env xs ys
+  | TArrow (args1, r1), TArrow (args2, r2) -> unify (List.fold_left2 unify env args1 args2) r1 r2
+  | TImplicit (n1, t1, c1), TImplicit (n2, t2, c2) when n1 = n2 -> unify (unify env t1 t2) c1 c2
+  | TNamed (n1, t1), TNamed (n2, t2) when n1 = n2 -> unify env t1 t2
+  | TRec (r1, t1), TRec (r2, t2) -> unify (unify env (TVar r1) (TVar r2)) t1 t2
+  | TQuant (q1, l1, t1), TQuant (q2, l2, t2) when l1 = l2 -> unify (unify env (TVar q1) (TVar q2)) t1 t2
+  | TOffer (w1, o1), TOffer (w2, o2) | TChoose (w1, o1), TChoose (w2, o2) when w1 = w2 -> (* TODO: Group by msg name *) env
+  | _, _ -> failwith @@ "Could not unify type " ^ string_of_type t1 ^ " with type " ^ string_of_type t2
