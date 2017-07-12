@@ -56,5 +56,23 @@ let rec unify env t1 t2 =
   | TNamed (n1, t1), TNamed (n2, t2) when n1 = n2 -> unify env t1 t2
   | TRec (r1, t1), TRec (r2, t2) -> unify (unify env (TVar r1) (TVar r2)) t1 t2
   | TQuant (q1, l1, t1), TQuant (q2, l2, t2) when l1 = l2 -> unify (unify env (TVar q1) (TVar q2)) t1 t2
-  | TOffer (w1, o1), TOffer (w2, o2) | TChoose (w1, o1), TChoose (w2, o2) when w1 = w2 -> (* TODO: Group by msg name *) env
+  | TOffer (w1, o1), TOffer (w2, o2) | TChoose (w1, o1), TChoose (w2, o2) when w1 = w2 ->
+    begin
+      let module Offers = Set.Make(String)
+      and name_of_offer (n, _, _) = n in
+      let names = Offers.(elements @@ union (of_list @@ List.map name_of_offer o1) (of_list @@ List.map name_of_offer o2)) in
+      let rec loop env = function
+        | [] -> env
+        | name::names ->
+          begin
+            let matcher = List.find (fun o -> name_of_offer o = name) in
+            match (matcher o1, matcher o2) with
+              | (_, t1, c1), (_, t2, c2) ->
+                let env = unify env t1 t2 in
+                let env = unify env c1 c2 in
+                loop env names
+              | exception Not_found -> loop env names
+          end in
+      loop env names
+    end
   | _, _ -> failwith @@ "Could not unify type " ^ string_of_type t1 ^ " with type " ^ string_of_type t2
