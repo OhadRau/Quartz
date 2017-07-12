@@ -1,6 +1,12 @@
 open Ast
 open Emit
 
+let type_test () =
+  let type1 = Type.(TRec (1, TVar 1))
+  and type2 = Type.(TRec (2, TVar 2)) in
+  let subst = Typecheck.(unify empty_env type1 type2) in
+  print_endline @@ Type.string_of_type (Typecheck.apply subst type1)
+
 let () =
   let lexbuf = Lexing.from_channel (open_in Sys.argv.(1)) in
   let ast =
@@ -25,4 +31,5 @@ let () =
                                  ; "Err", TApp ("()", [TApp ("String", [])]), TVar 1
                                  ])
                               ]))))
-  end)
+  end);
+  type_test ()

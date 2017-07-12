@@ -17,6 +17,11 @@ type env =
   ; state : int
   }
 
+let empty_env = { scope = Scope.empty
+                ; subst = Subst.empty
+                ; state = 0
+                }
+
 let fresh env =
   ({ env with state = env.state + 1 }, TVar env.state)
 
@@ -57,9 +62,12 @@ let rec unify env t1 t2 =
   | TRec (r1, t1), TRec (r2, t2) -> unify (unify env (TVar r1) (TVar r2)) t1 t2
   | TQuant (q1, l1, t1), TQuant (q2, l2, t2) when l1 = l2 -> unify (unify env (TVar q1) (TVar q2)) t1 t2
   | TOffer (w1, o1), TOffer (w2, o2) | TChoose (w1, o1), TChoose (w2, o2) when w1 = w2 ->
-    begin
-      let module Offers = Set.Make(String)
-      and name_of_offer (n, _, _) = n in
+    begin (* TODO: Make this create the substitutions necessary to make o1 = o2;
+                   Currently, this will not work if both types have unique names
+                   (e.g. o1 { a, b, c } & o2 { b, c, d }) because the substitutions
+                   will only be applied to one of the two types. *)
+      let module Offers = Set.Make(String) in
+      let name_of_offer (n, _, _) = n in
       let names = Offers.(elements @@ union (of_list @@ List.map name_of_offer o1) (of_list @@ List.map name_of_offer o2)) in
       let rec loop env = function
         | [] -> env
