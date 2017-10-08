@@ -38,7 +38,7 @@ Quartz is a statically typed, concurrent programming language for the BEAM VM ba
 #         [client : c]
 #         ?client{Start ~> !client{Ok ~> self, Err(String) ~> self}}
 session Server
-  branch Start from sender
+  on Start from sender
     case File.open("file.txt")
     when Success(f)
       sender!Ok
@@ -55,8 +55,8 @@ end
 session Client (target : Server)
   target!Start
 
-  branch Ok from target
-    branch Value(status) from target
+  on Ok from target
+    on Value(status) from target
       print(status)
     end
   or Err(e)
