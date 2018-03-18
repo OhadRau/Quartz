@@ -1,0 +1,4 @@
+# Alternative way of defining implicit types/vars?
+exists C.
+[ c : C ].
+?c{Hello ~> End}
