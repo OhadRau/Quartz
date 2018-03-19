@@ -8,41 +8,9 @@ type message = string
 
 type action = Send of channel * message | Recv of channel * message
 
-type transition = state * action * state
-
-type cfsm = {
-  (* Set of states *)
-  q  : state list;
-  (* Set of channels: (p1, p2) | p1 <> p2 *)
-  c  : channel list;
-  (* Initial state *)
-  q0 : state ;
-  (* Set of messages *)
-  a  : message list;
-  (* Set of transitions *)
-  d  : transition list
-}
-
 let subj = function
   | Send ((p, q), m) -> p
   | Recv ((p, q), m) -> q
-
-let state_kind cfsm state =
-  let transitions =
-    List.filter (fun (a, x, b) -> a = state) cfsm.d in
-  let rec identify kind = function
-    | [] -> kind
-    | (_, Send (_, _), _)::xs when kind = `Receiving ->
-      `Mixed
-    | (_, Send (_, _), _)::xs ->
-      identify `Sending xs
-    | (_, Recv (_, _), _)::xs when kind = `Sending ->
-      `Mixed
-    | (_, Recv (_, _), _)::xs ->
-      identify `Receiving xs in
-  identify `Final transitions
-
-type configuration = state * message list
 
 type ty = string
 
@@ -273,3 +241,182 @@ let rec advance_llts llts l = match (llts, l) with
   | LRecv (q, msgs), l ->
     LRecv (q, MsgSet.map (fun (m, ll) -> (m, advance_llts ll l)) msgs)
   | llts, l -> llts
+
+type configuration = local list * message list
+
+(* Def'n 3.4
+  advance_configuration c l =
+    match l with
+    | pq!a ->
+      let t'p' = map (if [not p] advance_llts t l) tp
+      and w'p'q' = map (if [not p] w ++ [a]) wpq in
+      (t'p', w'p'q')
+    | pq?a ->
+      let t'p' = map (if [not p] advance_llts t l) tp
+      and w'p'q' = map (if [not p && not q] a::w) wpq in
+      (t'p', w'p'q')
+*)
+
+type transition = local * action * local
+
+type cfsm = {
+  (* Set of states *)
+  q  : local list;
+  (* Set of channels: (p1, p2) | p1 <> p2 *)
+  c  : channel list;
+  (* Initial state *)
+  q0 : local;
+  (* Set of messages *)
+  a  : message list;
+  (* Set of transitions *)
+  d  : transition list
+}
+
+let state_kind cfsm state =
+  let transitions =
+    List.filter (fun (a, x, b) -> a = state) cfsm.d in
+  let rec identify kind = function
+    | [] -> kind
+    | (_, Send (_, _), _)::xs when kind = `Receiving ->
+      `Mixed
+    | (_, Send (_, _), _)::xs ->
+      identify `Sending xs
+    | (_, Recv (_, _), _)::xs when kind = `Sending ->
+      `Mixed
+    | (_, Recv (_, _), _)::xs ->
+      identify `Receiving xs in
+  identify `Final transitions
+
+let rec collect_local_types ?(lst=[]) = function
+  | LSend (_, msgs) | LRecv (_, msgs) ->
+    let ts = MsgSet.elements msgs |> List.map snd in
+    List.fold_left (fun lst t -> collect_local_types ~lst t) (ts @ lst) ts
+  | LRec (t, l) -> collect_local_types ~lst:(l::lst) l
+  | LType ty -> lst
+  | LEnd -> LEnd::lst
+
+module StringSet = Set.Make(String)
+
+let rec collect_participants ?(s=StringSet.empty) = function
+  | GMsg (p, q, msgs) | GMIP (p, q, _, msgs) ->
+    let s' = StringSet.(add p (add q s)) in
+    let lmsgs = GMsgSet.elements msgs in
+    List.fold_left (fun s (_, g) -> collect_participants ~s g) s' lmsgs
+  | GRec (_, g) -> collect_participants ~s g
+  | _ -> s
+
+let rec collect_messages ?(s=StringSet.empty) = function
+  | GMsg (_, _, msgs) | GMIP (_, _, _, msgs) ->
+    let lmsgs = GMsgSet.elements msgs in
+    List.fold_left (fun s (m, t) -> collect_messages ~s:(StringSet.add m s) t) s lmsgs
+  | GRec (_, g) -> collect_messages ~s g
+  | _ -> s
+
+let rec combinations = function
+  | [] -> []
+  | h::t ->
+    let headed = List.map (fun t -> (h, t)) t
+    and unheaded = combinations t in
+    headed @ unheaded
+
+module BindingMap = Map.Make(struct
+  type t = ty
+  let compare = compare
+end)
+
+let rec collect_local_bindings ?(m=BindingMap.empty) = function
+  | LSend (_, msgs) | LRecv (_, msgs) ->
+    let lmsgs = MsgSet.elements msgs in
+    List.fold_left (fun m (_, l) -> collect_local_bindings ~m l) m lmsgs
+  | LRec (t, l) ->
+    let m' = BindingMap.add t l m in
+    collect_local_bindings ~m:m' l
+  | LType _ -> m
+  | LEnd -> m
+
+module TransitionSet = Set.Make(struct
+  type t = transition
+  let compare = compare
+end)
+
+let rec collect_transitions ?(s=TransitionSet.empty) local_bindings p =
+  let get_t' = function
+    | LType t when BindingMap.mem t local_bindings ->
+      BindingMap.find t local_bindings
+    | t -> t in
+  function
+  | LSend (q, msgs) as t ->
+    let s' = MsgSet.fold (fun (a, t') s -> TransitionSet.add (t, Send ((p, q), a), get_t' t') s) msgs s in
+    let lmsgs = MsgSet.elements msgs in
+    List.fold_left (fun s (_, l) -> collect_transitions ~s local_bindings p l) s' lmsgs
+  | LRecv (q, msgs) as t ->
+    let s' = MsgSet.fold (fun (a, t') s -> TransitionSet.add (t, Recv ((p, q), a), get_t' t') s) msgs s in
+    let lmsgs = MsgSet.elements msgs in
+    List.fold_left (fun s (_, l) -> collect_transitions ~s local_bindings p l) s' lmsgs
+  | LRec (_, t) -> collect_transitions ~s local_bindings p t
+  | LType _ -> s
+  | LEnd -> s
+
+let cfsm_of_projection g p =
+  let t0 = project g p in
+  let q = collect_local_types t0
+  and c = combinations (StringSet.elements (collect_participants g))
+  and q0 = match t0 with
+    | LRec (t, l) -> l
+    | l -> l
+  and a = StringSet.elements (collect_messages g)
+  and d = TransitionSet.elements (collect_transitions (collect_local_bindings t0) p t0) in
+  { q; c; q0; a; d }
+
+(* Def'n 3.6: Translation from a basic CFSM to a local type
+let local_of_cfsm mp =
+  let t v q = (* Loop through participant, { !, ? }, etc. for t *)
+    let sends =
+      List.filter (function (t, Send (_, _), _) when r = q -> true
+                          | _ -> false) mp.d
+      |> List.map (fun (t, Send ((p, p'), aj), tj) -> aj, tj)
+    and recvs =
+      List.filter (function (t, Recv (_, _), _) when r = q -> true
+                          | _ -> false) mp.d in
+    match sends, recvs with
+    | (_::_) as s, [] ->
+    | [], (_::_) as r ->
+  and t' v q =
+  t [] mp.q0
+*)
+
+let cfsm_test =
+  let g =
+    GRec ("t", GMsg ("a", "b", GMsgSet.of_list [
+      "Hello", GMsg ("b", "c", GMsgSet.of_list [
+        "Start", GMsg ("c", "a", GMsgSet.of_list [
+          "Hello", GEnd
+        ])
+      ]);
+      "Ping", GMsg ("b", "a", GMsgSet.of_list [
+        "Pong", GType "t"
+      ])
+    ]))
+  and p = "a" in
+  let cfsm_expected =
+    { q  = []
+    ; c  = List.sort compare [ ("a", "b"); ("a", "c"); ("b", "c") ]
+    ; q0 = LSend ("b", MsgSet.of_list [
+             "Hello", LRecv ("c", MsgSet.of_list [
+               "Hello", LEnd
+             ]);
+             "Ping", LRecv ("b", MsgSet.of_list [
+               "Pong", LType "t"
+             ])
+           ])
+    ; a  = List.sort compare [ "Hello"; "Ping"; "Pong"; "Start" ]
+    ; d  = []
+    }
+  and cfsm = cfsm_of_projection g p in
+  match cfsm.q  = cfsm_expected.q
+      , cfsm.c  = cfsm_expected.c
+      , cfsm.q0 = cfsm_expected.q0
+      , cfsm.a  = cfsm_expected.a
+      , cfsm.d  = cfsm_expected.d with
+  | _, true, true, true, _ -> print_endline "[PASSED] CFSM Test"
+  | _                      -> print_endline "[FAILED] CFSM Test"
