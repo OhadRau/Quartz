@@ -6,7 +6,7 @@ type channel = participant * participant
 
 type message = string
 
-type action = Send of channel * message | Receive of channel * message
+type action = Send of channel * message | Recv of channel * message
 
 type transition = state * action * state
 
@@ -24,8 +24,8 @@ type cfsm = {
 }
 
 let subj = function
-  | Send    ((p, q), m) -> p
-  | Receive ((p, q), m) -> q
+  | Send ((p, q), m) -> p
+  | Recv ((p, q), m) -> q
 
 let state_kind cfsm state =
   let transitions =
@@ -36,9 +36,9 @@ let state_kind cfsm state =
       `Mixed
     | (_, Send (_, _), _)::xs ->
       identify `Sending xs
-    | (_, Receive (_, _), _)::xs when kind = `Sending ->
+    | (_, Recv (_, _), _)::xs when kind = `Sending ->
       `Mixed
-    | (_, Receive (_, _), _)::xs ->
+    | (_, Recv (_, _), _)::xs ->
       identify `Receiving xs in
   identify `Final transitions
 
@@ -55,6 +55,7 @@ end)
 and Global : sig
   type global =
     | GMsg of participant * participant * GMsgSet.t
+    | GMIP of participant * participant * message * GMsgSet.t (* Message In Progress *)
     | GRec of ty * global
     | GType of ty
     | GEnd
@@ -62,9 +63,14 @@ end = Global
 
 include Global
 
+let global_of_msg i msgs =
+  GMsgSet.find (i, GEnd) msgs |> snd
+
 let rec string_of_global = function
   | GMsg (p, p', msgs) ->
     p ^ "→" ^ p' ^ ":{" ^ fmt_global_msgs msgs ^ "}"
+  | GMIP (p, p', j, msgs) ->
+    p ^ "⇝" ^ p' ^ ":" ^ j ^ "{" ^ fmt_global_msgs msgs ^ "}"
   | GRec (ty, g) ->
     "μ" ^ ty ^ "." ^ string_of_global g
   | GType ty -> ty
@@ -75,6 +81,12 @@ and fmt_global_msgs set = match GMsgSet.elements set with
   | [] -> ""
   | [(m, g)] -> m ^ "." ^ string_of_global g
   | (m, g)::xs -> m ^ "." ^ string_of_global g ^ ", " ^ fmt_global_msgs (GMsgSet.of_list xs)
+
+let rec subst ~target ~replace = function
+  | GMsg (p, p', msgs) -> GMsg (p, p', GMsgSet.map (fun (m, g) -> (m, subst ~target ~replace g)) msgs)
+  | GRec (t, g) -> GRec (t, subst ~target ~replace g)
+  | GType t when t = target -> replace
+  | g -> g
 
 module rec MsgSet : Set.S with type elt = message * Local.local = Set.Make(struct
   type t = message * Local.local
@@ -169,6 +181,7 @@ let rec project global q = match global with
   | GRec (t, g) -> LEnd
   | GType t -> LType t 
   | GEnd -> LEnd
+  | GMIP (_, _, _, _) -> failwith "Cannot project a message-in-progress"
 
 and project_msgs msgs q =
   let lmsgs = GMsgSet.elements msgs in
@@ -204,3 +217,36 @@ let eg_commit =
                print_endline ("When projecting " ^ string_of_global global);
                print_endline ("Got " ^ string_of_local local_c);
                print_endline ("Expected " ^ string_of_local local_c_expected)
+
+let rec advance glts l = match (glts, l) with
+  | GMsg (p, p', msgs), Send ((q, q'), m)
+    when GMsgSet.mem (m, GEnd) msgs && p = q && p' = q' ->
+    GMIP (p, p', m, msgs)
+  | GMIP (p, p', j, msgs), Recv ((q, q'), m)
+    when j = m && p = q && p' = q' ->
+    global_of_msg j msgs
+  | GRec (t, g), l ->
+    advance (subst ~target:t ~replace:(GRec (t, g)) g) l
+  | GMsg (p, p', msgs), l -> GMsg (p, p', GMsgSet.map (fun (m, g) -> (m, advance g l)) msgs)
+  | GMIP (p, p', j, msgs), l -> GMIP (p, p', j, GMsgSet.map (fun (m, g) -> (m, advance g l)) msgs)
+  | glts, t -> glts
+
+let glts_test =
+  let g1 = GMsg ("A", "B", GMsgSet.of_list [
+    "a", GMsg ("A", "C", GMsgSet.of_list [
+      "b", GEnd
+    ])
+  ])
+  and l1 = Send (("A", "B"), "a")
+  and l2 = Recv (("A", "B"), "a")
+  and l3 = Send (("A", "C"), "b")
+  and l4 = Recv (("A", "C"), "b") in
+  let r1 =
+    advance (advance (advance (advance g1 l1) l2) l3) l4
+  and r2 =
+    advance (advance (advance (advance g1 l1) l3) l2) l4
+  and r3 =
+    advance (advance (advance (advance g1 l1) l3) l4) l2 in
+  match (r1, r2, r3) with
+    | GEnd, GEnd, GEnd -> print_endline "[PASSED] GLTS Test"
+    | r1, r2, r3       -> print_endline "[FAILED] GLTS Test"
