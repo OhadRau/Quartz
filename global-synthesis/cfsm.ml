@@ -82,9 +82,10 @@ and fmt_global_msgs set = match GMsgSet.elements set with
   | [(m, g)] -> m ^ "." ^ string_of_global g
   | (m, g)::xs -> m ^ "." ^ string_of_global g ^ ", " ^ fmt_global_msgs (GMsgSet.of_list xs)
 
-let rec subst ~target ~replace = function
-  | GMsg (p, p', msgs) -> GMsg (p, p', GMsgSet.map (fun (m, g) -> (m, subst ~target ~replace g)) msgs)
-  | GRec (t, g) -> GRec (t, subst ~target ~replace g)
+let rec gsubst ~target ~replace = function
+  | GMsg (p, p', msgs) -> GMsg (p, p', GMsgSet.map (fun (m, g) -> (m, gsubst ~target ~replace g)) msgs)
+  | GMIP (p, p', j, msgs) -> GMIP (p, p', j, GMsgSet.map (fun (m, g) -> (m, gsubst ~target ~replace g)) msgs)
+  | GRec (t, g) -> GRec (t, gsubst ~target ~replace g)
   | GType t when t = target -> replace
   | g -> g
 
@@ -122,6 +123,13 @@ and fmt_local_msgs set = match MsgSet.elements set with
   | [] -> ""
   | [(m, g)] -> m ^ "." ^ string_of_local g
   | (m, g)::xs -> m ^ "." ^ string_of_local g ^ ", " ^ fmt_local_msgs (MsgSet.of_list xs)
+
+let rec lsubst ~target ~replace = function
+  | LSend (p, msgs) -> LSend (p, MsgSet.map (fun (m, l) -> (m, lsubst ~target ~replace l)) msgs)
+  | LRecv (p, msgs) -> LRecv (p, MsgSet.map (fun (m, l) -> (m, lsubst ~target ~replace l)) msgs)
+  | LRec (t, l) -> LRec (t, lsubst ~target ~replace l)
+  | LType t when t = target -> replace
+  | l -> l
 
 let rec mergeable l1 l2 =
   match (l1, l2) with
@@ -218,7 +226,7 @@ let eg_commit =
                print_endline ("Got " ^ string_of_local local_c);
                print_endline ("Expected " ^ string_of_local local_c_expected)
 
-let rec advance glts l = match (glts, l) with
+let rec advance_glts glts l = match (glts, l) with
   | GMsg (p, p', msgs), Send ((q, q'), m)
     when GMsgSet.mem (m, GEnd) msgs && p = q && p' = q' ->
     GMIP (p, p', m, msgs)
@@ -226,9 +234,9 @@ let rec advance glts l = match (glts, l) with
     when j = m && p = q && p' = q' ->
     global_of_msg j msgs
   | GRec (t, g), l ->
-    advance (subst ~target:t ~replace:(GRec (t, g)) g) l
-  | GMsg (p, p', msgs), l -> GMsg (p, p', GMsgSet.map (fun (m, g) -> (m, advance g l)) msgs)
-  | GMIP (p, p', j, msgs), l -> GMIP (p, p', j, GMsgSet.map (fun (m, g) -> (m, advance g l)) msgs)
+    advance_glts (gsubst ~target:t ~replace:(GRec (t, g)) g) l
+  | GMsg (p, p', msgs), l -> GMsg (p, p', GMsgSet.map (fun (m, g) -> (m, advance_glts g l)) msgs)
+  | GMIP (p, p', j, msgs), l -> GMIP (p, p', j, GMsgSet.map (fun (m, g) -> (m, advance_glts g l)) msgs)
   | glts, t -> glts
 
 let glts_test =
@@ -242,11 +250,26 @@ let glts_test =
   and l3 = Send (("A", "C"), "b")
   and l4 = Recv (("A", "C"), "b") in
   let r1 =
-    advance (advance (advance (advance g1 l1) l2) l3) l4
+    advance_glts (advance_glts (advance_glts (advance_glts g1 l1) l2) l3) l4
   and r2 =
-    advance (advance (advance (advance g1 l1) l3) l2) l4
+    advance_glts (advance_glts (advance_glts (advance_glts g1 l1) l3) l2) l4
   and r3 =
-    advance (advance (advance (advance g1 l1) l3) l4) l2 in
+    advance_glts (advance_glts (advance_glts (advance_glts g1 l1) l3) l4) l2 in
   match (r1, r2, r3) with
     | GEnd, GEnd, GEnd -> print_endline "[PASSED] GLTS Test"
     | r1, r2, r3       -> print_endline "[FAILED] GLTS Test"
+
+let rec advance_llts llts l = match (llts, l) with
+  | LSend (q, msgs), Send ((_, q'), a)
+    when MsgSet.mem (a, LEnd) msgs && q = q' ->
+    local_of_msg a msgs
+  | LRecv (q, msgs), Recv ((q', _), a)
+    when MsgSet.mem (a, LEnd) msgs && q = q' ->
+    local_of_msg a msgs
+  | LRec (t, local), l ->
+    advance_llts (lsubst ~target:t ~replace:(LRec (t, local)) local) l
+  | LSend (q, msgs), l ->
+    LSend (q, MsgSet.map (fun (m, ll) -> (m, advance_llts ll l)) msgs)
+  | LRecv (q, msgs), l ->
+    LRecv (q, MsgSet.map (fun (m, ll) -> (m, advance_llts ll l)) msgs)
+  | llts, l -> llts
