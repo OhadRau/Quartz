@@ -8,6 +8,10 @@ type message = string
 
 type action = Send of channel * message | Recv of channel * message
 
+let string_of_action = function
+  | Send ((p, p'), m) -> p ^ "→" ^ p' ^ ":" ^ m
+  | Recv ((p, p'), m) -> p' ^ "→" ^ p ^ ":" ^ m
+
 let subj = function
   | Send ((p, q), m) -> p
   | Recv ((p, q), m) -> q
@@ -259,6 +263,9 @@ type configuration = local list * message list
 
 type transition = local * action * local
 
+let string_of_transition (l1, a, l2) =
+  string_of_local l1 ^ "--[" ^ string_of_action a ^ "]-->" ^ string_of_local l2
+
 type cfsm = {
   (* Set of states *)
   q  : local list;
@@ -271,6 +278,14 @@ type cfsm = {
   (* Set of transitions *)
   d  : transition list
 }
+
+let string_of_cfsm cfsm =
+  let q  = "q  = " ^ String.concat ",\n     " (List.map string_of_local cfsm.q)
+  and c  = "c  = " ^ String.concat ",\n     " (List.map (fun (a, b) -> "(" ^ a ^ ", " ^ b ^ ")") cfsm.c)
+  and q0 = "q0 = " ^ string_of_local cfsm.q0
+  and a  = "a  = " ^ String.concat ",\n     " cfsm.a
+  and d  = "d  = " ^ String.concat ",\n     " (List.map string_of_transition cfsm.d) in
+  q ^ "\n" ^ c ^ "\n" ^ q0 ^ "\n" ^ a ^ "\n" ^ d
 
 let state_kind cfsm state =
   let transitions =
@@ -413,6 +428,7 @@ let cfsm_test =
     ; d  = []
     }
   and cfsm = cfsm_of_projection g p in
+  print_endline (string_of_cfsm cfsm);
   match cfsm.q  = cfsm_expected.q
       , cfsm.c  = cfsm_expected.c
       , cfsm.q0 = cfsm_expected.q0
@@ -420,3 +436,33 @@ let cfsm_test =
       , cfsm.d  = cfsm_expected.d with
   | _, true, true, true, _ -> print_endline "[PASSED] CFSM Test"
   | _                      -> print_endline "[FAILED] CFSM Test"
+
+(* Def'n 3.6: Translation from a basic CFSM to a local type ... *)
+
+let rec binary_compatible = function
+  | LRec (t, l) -> LRec (t, binary_compatible l)
+  | LSend (p, msgs) -> LRecv (p, MsgSet.map (fun (a, t) -> (a, binary_compatible t)) msgs)
+  | LRecv (p, msgs) -> LSend (p, MsgSet.map (fun (a, t) -> (a, binary_compatible t)) msgs)
+  | LType t -> LType t
+  | LEnd -> LEnd
+
+(* Def'n 4.1
+  let merge_cfsms cfsms =
+    { q  = List.fold_left (fun l {q} -> q @ l) [] cfsms
+    ; c
+    ; q0
+    ; a
+    ; d
+    } *)
+
+(* Pre-synth:
+     - Take communicating system S, such that forall p in S, exists q in S, s.t. pq!a or pq?a
+     - q : ((participant, id) list, local) where id = global name of session
+     - Assign to each qn some unique identifier Un
+     - Replace all instances referencing participantn/idn in each q with Un
+let synth qs =
+  let pairs = StringMap.bindings qs |> combinations in
+  let rec loop = function
+    | [] -> StringMap.bindings qs |> List.map (fun (n, _) -> GType n)
+    | ((pn, LSend (qn', qmsgs)), (qn, LRecv (pn', pmsgs)))::pqs when pn = pn' && qn = qn' ->
+    | ((pn, LRecv (qn', qmsgs)), (qn, LSend (pn', pmsgs)))::pqs when pn = pn' && qn = qn' -> *)
