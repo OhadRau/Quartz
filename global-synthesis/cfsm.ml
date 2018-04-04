@@ -486,8 +486,10 @@ let merge_cfsms cfsms =
       let qs' = List.map (function p when p = q -> q' | p -> p) qs in
       follow_states qs' ((qs, l, qs')::lst) states in
   { gq  = List.fold_left (fun l {q} -> q @ l) [] cfsms
+  (* FIXME: should be a set *)
   ; gc  = List.map (fun {c} -> c) cfsms |> List.concat
   ; gq0 = q0s
+  (* FIXME: should be a set *)
   ; ga  = List.map (fun {a} -> a) cfsms |> List.concat
   ; gd  = follow_states q0s [] ds
   }
