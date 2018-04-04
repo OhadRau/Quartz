@@ -143,7 +143,7 @@ let rec merge t1 t2 =
     let merged = MsgSet.map (fun (m, _) -> (m, merge (local_of_msg m m1) (local_of_msg m m2))) i
     and kj = MsgSet.diff k j and jk = MsgSet.diff j k in
     LSend (p1, MsgSet.union merged (MsgSet.union kj jk))
-  | _ -> failwith "Can't merge unmergeable local types"
+  | _ -> failwith @@ "Can't merge unmergeable local types: type " ^ string_of_local t1 ^ " is incompatible with type " ^ string_of_local t2
 
 let rec project global q = match global with
   | GMsg (p, p', msgs) when q = p ->
@@ -408,7 +408,7 @@ let cfsm_test =
           "Hello", GEnd
         ])
       ]);
-      "Ping", GMsg ("b", "a", GMsgSet.of_list [
+      "Ping", GMsg ("b", "c", GMsgSet.of_list [
         "Pong", GType "t"
       ])
     ]))
@@ -419,9 +419,6 @@ let cfsm_test =
     ; q0 = LSend ("b", MsgSet.of_list [
              "Hello", LRecv ("c", MsgSet.of_list [
                "Hello", LEnd
-             ]);
-             "Ping", LRecv ("b", MsgSet.of_list [
-               "Pong", LType "t"
              ])
            ])
     ; a  = List.sort compare [ "Hello"; "Ping"; "Pong"; "Start" ]
@@ -446,14 +443,72 @@ let rec binary_compatible = function
   | LType t -> LType t
   | LEnd -> LEnd
 
+(* Global transition *)
+type gtransition = local list * action * local list
+
+let string_of_gtransition (gs, a, gs') =
+  let string_of_locals ls =
+    "(" ^ String.concat ", " (List.map string_of_local ls) ^ ")" in
+  string_of_locals gs ^ "--[" ^ string_of_action a ^ "]-->" ^ string_of_locals gs'
+
+type gcfsm = { (* Global CFSM *)
+  (* Set of states *)
+  gq  : local list;
+  (* Set of channels: (p1, p2) | p1 <> p2 *)
+  gc  : channel list;
+  (* Initial states *)
+  gq0 : local list;
+  (* Set of messages *)
+  ga  : message list;
+  (* Set of transitions *)
+  gd  : gtransition list
+}
+
+let string_of_gcfsm gcfsm =
+  let q  = "q  = " ^ String.concat ",\n     " (List.map string_of_local gcfsm.gq)
+  and c  = "c  = " ^ String.concat ",\n     " (List.map (fun (a, b) -> "(" ^ a ^ ", " ^ b ^ ")") gcfsm.gc)
+  and q0 = "q0 = " ^ String.concat ",\n     " (List.map string_of_local gcfsm.gq0)
+  and a  = "a  = " ^ String.concat ",\n     " gcfsm.ga
+  and d  = "d  = " ^ String.concat ",\n     " (List.map string_of_gtransition gcfsm.gd) in
+  q ^ "\n" ^ c ^ "\n" ^ q0 ^ "\n" ^ a ^ "\n" ^ d
+
 (* Def'n 4.1
-  let merge_cfsms cfsms =
-    { q  = List.fold_left (fun l {q} -> q @ l) [] cfsms
-    ; c
-    ; q0
-    ; a
-    ; d
-    } *)
+     Merges cfsms into a gcfsm.
+     Assumes that each cfsm has been set up with a proper label.
+ *)
+let merge_cfsms cfsms =
+  let ds  = List.map (fun {d} -> d) cfsms |> List.concat
+  and q0s = List.map (fun {q0} -> q0) cfsms in
+  (* FIXME: follow_states will not trace states in the correct global order *)
+  let rec follow_states qs lst = function
+    | [] -> lst
+    | (q, l, q')::states ->
+      let qs' = List.map (function p when p = q -> q' | p -> p) qs in
+      follow_states qs' ((qs, l, qs')::lst) states in
+  { gq  = List.fold_left (fun l {q} -> q @ l) [] cfsms
+  ; gc  = List.map (fun {c} -> c) cfsms |> List.concat
+  ; gq0 = q0s
+  ; ga  = List.map (fun {a} -> a) cfsms |> List.concat
+  ; gd  = follow_states q0s [] ds
+  }
+
+let gcfsm_test =
+  let g =
+    GRec ("t", GMsg ("a", "b", GMsgSet.of_list [
+      "Hello", GMsg ("b", "c", GMsgSet.of_list [
+        "Start", GMsg ("c", "a", GMsgSet.of_list [
+          "Hello", GEnd
+        ])
+      ]);
+      "Ping", GMsg ("b", "c", GMsgSet.of_list [
+        "Pong", GType "t"
+      ])
+    ])) in
+  let cfsm_a = cfsm_of_projection g "a"
+  and cfsm_b = cfsm_of_projection g "b"
+  and cfsm_c = cfsm_of_projection g "c" in
+  let gcfsm = merge_cfsms [cfsm_a; cfsm_b; cfsm_c] in
+  print_endline (string_of_gcfsm gcfsm)
 
 (* Pre-synth:
      - Take communicating system S, such that forall p in S, exists q in S, s.t. pq!a or pq?a
