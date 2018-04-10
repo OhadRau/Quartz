@@ -4,7 +4,25 @@ The Quartz VM:
 * Probably needs some fancy rock-related name (SiO2, Silicon/Silica, Oxygen, Mineral, Amethyst)
 * Exceptions are first-class
 * Concurrency/parallelism are first-class
-* Message passing is first-class
+* Message passing is first-class (w/ message queues)
+  + All threads have implicit mailboxes
+  + Thread type can be defined as:
+    ```ocaml
+    type qthread = {
+      address : int;
+      mailbox : message_queue; (* What happens if the thread is on a different computer? *)
+      proc : [ `Process of native_process | `Thread of native_thread | `Socket of native_socket ];
+    }
+    ```
+  + Thread objects have the following (external) operations:
+    - `kill`         => Forcibly terminate the thread
+    - `enqueue_msg`  => Add a message to a thread's message queue
+    - `clear_queue`  => Clear a thread's message queue
+    - `exec_program` => Set the program (function/session) to run on that thread
+    - `fork`         => Duplicate the thread
+    - `migrate`      => Move a thread to a different native thread/process or a different computer and change the socket
+    - `pause_exec`   => Temporarily pause execution of the thread's program
+    - `resume_exec`  => Resume execution of the thread's program
 * Built-in GC
 * Stack-based probably
 * Doesn't need to be extremely low-level
@@ -13,6 +31,7 @@ The Quartz VM:
 * Somewhat dynamically typed
   + When code hops between computers, we need some checks to make sure everything is okay
   + E.g. if one server goes AWOL, we need dynamic chceks in place to respond
+  + We can assume that all local threads are safe at runtime
 
 ## Ideas:
 
