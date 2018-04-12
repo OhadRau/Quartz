@@ -134,3 +134,21 @@ function main < () -> void >:
   swap
   call_constructor_async @Q [-1] # Takes 1 off the stack (p) and runs on thread q
 ```
+
+## The QuartzVM Protocol
+
+* VMs will often be running either in separate processes or on separate systems
+* We can use network sockets to communicate between these on some protocol
+  + Most likely TCP-based, UDP would be nice but safety is more important => maybe compiler flag?
+* Can occur at macro level (entire VMs communicating) or micro level (sessions communicating across servers)
+
+### Definition:
+
+```
+[QVM_OPERATION][QVM_NUM_PARAMS][QVM_PARAMS...]
+
+QVM_OPERATION =
+  | "qvm_immigrate" -- (thread_id, context, code_pointer) -> status   => Take an "immigrant" thread
+  | "qvm_emigrate"  -- (thread_id) -> (status, context, code_pointer) => Give thread information
+  | "qvm_kill"      -- (thread_id) -> status                          => Kill a thread
+```

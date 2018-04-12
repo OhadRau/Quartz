@@ -10,12 +10,42 @@
 
 namespace qz { namespace vm {
 
+struct QzVm;
+
+struct QzContext;
 struct QzDatum;
 struct QzFunction;
 struct QzThread;
 
 struct QzMessage;
 struct QzInstruction;
+
+struct QzVm {
+  std::size_t stack_size;
+  std::size_t heap_size;
+
+  std::vector<std::int8_t> heap;
+
+  std::map<std::string, QzFunction> function_table;
+  std::map<std::thread::id, std::shared_ptr<QzThread>> thread_map;
+
+  QzVm(std::size_t stack_size,
+       std::size_t heap_size,
+       std::vector<QzFunction> program,
+       std::vector<QzInstruction> instrs);
+
+  static std::shared_ptr<QzVm> create_and_run(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<QzInstruction> instrs);
+};
+
+struct QzContext {
+  std::size_t stack_ptr;
+  std::size_t frame_ptr;
+  std::size_t instr_ptr;
+
+  std::vector<std::size_t> stack;
+
+  QzContext(std::size_t stack_size);
+};
 
 enum QzDatumType {
   QZ_DATUM_INT,
@@ -37,6 +67,8 @@ struct QzDatum {
     std::shared_ptr<QzThread>   thread;
   };
 
+  QzDatum(const QzDatum &d);
+
   QzDatum(std::int64_t i);
   QzDatum(double d);
   QzDatum(std::size_t s);
@@ -50,7 +82,7 @@ struct QzDatum {
 struct QzFunction {
   std::string name;
   std::size_t arity;
-  std::vector<QzInstruction> program;
+  std::size_t program_ptr;
 };
 
 enum QzThreadType {
@@ -59,16 +91,13 @@ enum QzThreadType {
 };
 
 struct QzLocalThread {
+  std::shared_ptr<QzVm> vm;
+  QzContext ctx;
   std::shared_ptr<std::thread> thread;
   std::queue<QzMessage> message_queue;
-  // VM Context (do we really need this?)
-  std::shared_ptr<QzFunction> program;
 };
 
 struct QzThread {
-private:
-  static std::map<std::thread::id, std::shared_ptr<QzThread>> thread_map;
-public:
   std::thread::id thread_id;
 
   QzThreadType type;
@@ -79,18 +108,16 @@ public:
     // Socket
   };
 
-  QzThread();
-  QzThread(std::shared_ptr<QzFunction>);
+  QzThread(std::shared_ptr<QzVm> vm);
 
-  static std::shared_ptr<QzThread> create();
-  static std::shared_ptr<QzThread> create(std::shared_ptr<QzFunction> f);
+  static std::shared_ptr<QzThread> create(std::shared_ptr<QzVm> vm);
 
   ~QzThread();
 
   void kill();
   void enqueue_msg(QzMessage m);
   void clear_msg_queue();
-  void exec_program(std::shared_ptr<QzFunction> f);
+  void exec_function(std::string name);
   std::shared_ptr<QzThread> fork();
   void migrate(QzThreadType t);
   void pause();
@@ -98,13 +125,15 @@ public:
 };
 
 struct QzMessage {
-  std::size_t message_symbol;
-  std::string message_name;
-  std::thread::id sender_id;
+  std::size_t          message_symbol;
+  std::string          message_name;
+  std::vector<QzDatum> message_params;
+  std::thread::id      sender_id;
 };
 
 struct QzInstruction {
-  std::int64_t instr;
+  enum { QZ_OP_NOP } opcode;
+  std::int64_t a, b, c, d; // Upto 4 params
 };
 
 } }
