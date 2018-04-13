@@ -2,11 +2,14 @@
 #define QVM_TYPES_H
 
 #include <map>
+#include <array>
 #include <queue>
 #include <memory>
 #include <thread>
 #include <vector>
 #include <cstdint>
+
+#include "qvm_instrs.h"
 
 namespace qz { namespace vm {
 
@@ -18,7 +21,6 @@ struct QzFunction;
 struct QzThread;
 
 struct QzMessage;
-struct QzInstruction;
 
 struct QzVm {
   std::size_t stack_size;
@@ -32,9 +34,9 @@ struct QzVm {
   QzVm(std::size_t stack_size,
        std::size_t heap_size,
        std::vector<QzFunction> program,
-       std::vector<QzInstruction> instrs);
+       std::vector<Instruction> instrs);
 
-  static std::shared_ptr<QzVm> create_and_run(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<QzInstruction> instrs);
+  static std::shared_ptr<QzVm> create_and_run(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<Instruction> instrs);
 };
 
 struct QzContext {
@@ -42,7 +44,7 @@ struct QzContext {
   std::size_t frame_ptr;
   std::size_t instr_ptr;
 
-  std::vector<std::size_t> stack;
+  std::vector<QzDatum> stack;
 
   QzContext(std::size_t stack_size);
 };
@@ -54,27 +56,34 @@ enum QzDatumType {
   QZ_DATUM_STRING,
   QZ_DATUM_FUNCTION_POINTER,
   QZ_DATUM_THREAD,
+  QZ_DATUM_INTERNAL
 }; // TODO: Product types + sum types (or lists, arrays, etc.)
 
 struct QzDatum {
   QzDatumType type;
   union {
-    std::int64_t                int_;
-    double                      float_;
-    std::size_t                 symbol;
-    std::string                 string;
-    std::shared_ptr<QzFunction> function;
-    std::shared_ptr<QzThread>   thread;
+    std::int64_t                 int_;
+    double                       float_;
+    std::size_t                  symbol;
+    std::shared_ptr<std::string> string;
+    std::shared_ptr<QzFunction>  function;
+    std::shared_ptr<QzThread>    thread;
+    std::array<int8_t, 16>       internal;
   };
 
+  QzDatum();
   QzDatum(const QzDatum &d);
 
   QzDatum(std::int64_t i);
   QzDatum(double d);
   QzDatum(std::size_t s);
   QzDatum(std::string s);
+  QzDatum(std::shared_ptr<std::string> s);
   QzDatum(std::shared_ptr<QzFunction> f);
   QzDatum(std::shared_ptr<QzThread> t);
+  QzDatum(std::array<std::int8_t, 16> a);
+
+  QzDatum &operator=(const QzDatum &d);
 
   ~QzDatum();
 };
@@ -92,9 +101,9 @@ enum QzThreadType {
 
 struct QzLocalThread {
   std::shared_ptr<QzVm> vm;
-  QzContext ctx;
+  std::shared_ptr<QzContext> ctx;
   std::shared_ptr<std::thread> thread;
-  std::queue<QzMessage> message_queue;
+  std::shared_ptr<std::queue<QzMessage>> message_queue;
 };
 
 struct QzThread {
@@ -129,11 +138,6 @@ struct QzMessage {
   std::string          message_name;
   std::vector<QzDatum> message_params;
   std::thread::id      sender_id;
-};
-
-struct QzInstruction {
-  enum { QZ_OP_NOP } opcode;
-  std::int64_t a, b, c, d; // Upto 4 params
 };
 
 } }

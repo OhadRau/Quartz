@@ -1,8 +1,10 @@
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <iostream>
 #include <functional>
 #include "qvm_types.h"
+#include "qvm_instrs.h"
 
 using namespace qz::vm;
 
@@ -23,7 +25,13 @@ int main(int argc, char **argv) {
     }
   };
 
-  auto vm = QzVm::create_and_run(256, 131072, functions, std::vector<QzInstruction>());
+  std::vector<Instruction> instrs = {
+    Instruction(POP),
+    Instruction(NOP),
+    Instruction(SPAWN_EMPTY)
+  };
+
+  auto vm = QzVm::create_and_run(256, 131072, functions, instrs);
 
   QzDatum threadA(QzThread::create(vm));
   QzDatum threadB(QzThread::create(vm));
