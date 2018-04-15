@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include <cstdint>
+#include <functional>
 
 #include "qvm_instrs.h"
 
@@ -40,6 +41,8 @@ struct QzVm {
 };
 
 struct QzContext {
+  bool thread_running;
+
   std::size_t stack_ptr;
   std::size_t frame_ptr;
   std::size_t instr_ptr;
@@ -92,6 +95,7 @@ struct QzFunction {
   std::string name;
   std::size_t arity;
   std::size_t program_ptr;
+  std::optional<std::function<void(std::shared_ptr<QzVm>, std::shared_ptr<QzContext>)>> lambda;
 };
 
 enum QzThreadType {

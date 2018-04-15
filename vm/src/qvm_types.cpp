@@ -2,8 +2,6 @@
 
 #include "qvm_interpreter.h"
 
-#include <iostream>
-
 namespace qz { namespace vm {
 
 QzVm::QzVm(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<Instruction> instrs) {
@@ -11,6 +9,9 @@ QzVm::QzVm(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction
   this->heap_size = heap_size;
 
   this->heap = std::vector<std::int8_t>(heap_size);
+  int8_t *ibase_ptr = (int8_t *)&instrs[0];
+  for (int i = 0; i < instrs.size() * sizeof(Instruction); i++)
+    this->heap[i] = ibase_ptr[i];
   // TODO: Allocate portions of the heap, fill with instructions
 
   for (auto fn : program) {
@@ -24,17 +25,19 @@ std::shared_ptr<QzVm> QzVm::create_and_run(std::size_t stack_size, std::size_t h
 
   auto main_thread = QzThread::create(vm);
   main_thread->exec_function("<QZ%START>");
+  main_thread->resume();
 
   return vm;
 }
 
 QzContext::QzContext(std::size_t stack_size) {
+  this->thread_running = false;
   this->stack = std::vector<QzDatum>(stack_size);
   this->stack_ptr = this->frame_ptr = 0;
   this->instr_ptr = 0;
 }
 
-QzDatum::QzDatum() {
+QzDatum::QzDatum() : string{} { // HACK
   this->type = QZ_DATUM_INTERNAL;
   this->internal = std::array<int8_t, 16> {};
 }
@@ -54,22 +57,22 @@ QzDatum::QzDatum(std::size_t s) {
   this->symbol = s;
 }
 
-QzDatum::QzDatum(std::string s) {
+QzDatum::QzDatum(std::string s) : string{} {
   this->type = QZ_DATUM_STRING;
   this->string = std::make_shared<std::string>(s);
 }
 
-QzDatum::QzDatum(std::shared_ptr<std::string> s) {
+QzDatum::QzDatum(std::shared_ptr<std::string> s) : string{} {
   this->type = QZ_DATUM_STRING;
   this->string = s;
 }
 
-QzDatum::QzDatum(std::shared_ptr<QzFunction> f) {
+QzDatum::QzDatum(std::shared_ptr<QzFunction> f) : function{} {
   this->type = QZ_DATUM_FUNCTION_POINTER;
   this->function = f;
 }
 
-QzDatum::QzDatum(std::shared_ptr<QzThread> t) {
+QzDatum::QzDatum(std::shared_ptr<QzThread> t) : thread{} {
   this->type = QZ_DATUM_THREAD;
   this->thread = t;
 }
@@ -79,7 +82,7 @@ QzDatum::QzDatum(std::array<std::int8_t, 16> a) {
   this->internal = a;
 }
 
-QzDatum::QzDatum(const QzDatum &d) {
+QzDatum::QzDatum(const QzDatum &d) : string{} { // HACK
   this->type = d.type;
   switch (d.type) {
   case QZ_DATUM_INT:
@@ -127,15 +130,28 @@ QzDatum &QzDatum::operator=(const QzDatum &d) {
   }
 }
 
-QzDatum::~QzDatum() {}
+QzDatum::~QzDatum() {
+  switch (this->type) {
+  case QZ_DATUM_STRING:
+    this->string.~shared_ptr();
+    break;
+  case QZ_DATUM_FUNCTION_POINTER:
+    this->function.~shared_ptr();
+    break;
+  case QZ_DATUM_THREAD:
+    this->thread.~shared_ptr();
+    break;
+  }
+}
 
 QzThread::QzThread(std::shared_ptr<QzVm> vm) {
   this->type = QZ_THREAD_LOCAL;
+
   this->local.vm = vm;
   this->local.ctx = std::make_shared<QzContext>(vm->stack_size);
-  this->local.message_queue = std::shared_ptr<std::queue<QzMessage>>();
+  this->local.message_queue = std::make_shared<std::queue<QzMessage>>();
   this->local.thread = std::make_shared<std::thread>(&qz_run_local, vm, this->local.ctx, this->local.message_queue);
-  this->local.thread->join();
+  this->local.thread->detach();
 
   this->thread_id = this->local.thread->get_id();
 }
@@ -169,18 +185,18 @@ void QzThread::exec_function(std::string name) { // Assumes you already pushed t
     this->pause();
     auto found = this->local.vm->function_table.find(name);
     if (found != this->local.vm->function_table.end()) {
-      this->local.ctx->instr_ptr = found->second.program_ptr;
+      this->local.ctx->instr_ptr = found->second.program_ptr * sizeof(Instruction);
     }
     this->resume();
   }
 }
 
 void QzThread::pause() {
-  // TODO: Implement thread pausing
+  this->local.ctx->thread_running = false;
 }
 
 void QzThread::resume() {
-  // TODO: Implement thread resuming
+  this->local.ctx->thread_running = true;
 }
 
 QzThread::~QzThread() {

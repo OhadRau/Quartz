@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <variant>
 #include <optional>
 
 namespace qz { namespace vm {
@@ -24,8 +25,6 @@ enum Opcode {
   NOT,
   DUP,
   SWAP,
-  OVER,
-  ROT,
   EXCHANGE,
   CMP,
   JEQ,
@@ -42,7 +41,8 @@ enum Opcode {
   SEND_MSG,
   AWAIT_MSG,
   KILL,
-  CLOSE
+  CLOSE,
+  CLOSE_ERR
 };
 
 enum OperandType {
@@ -53,6 +53,13 @@ enum OperandType {
   StackRef,
   FuncRef
 };
+
+struct TILiteral { std::int64_t i; };
+struct TFLiteral { double f; };
+struct TString { std::string s; };
+struct TSymbol { std::string s; };
+struct TStackRef { std::size_t s; };
+struct TFuncRef { std::string f; };
 
 struct Operand {
   OperandType type;
@@ -65,6 +72,13 @@ struct Operand {
     std::size_t                  stackref;
     std::shared_ptr<std::string> funcref;
   };
+
+  Operand(TILiteral);
+  Operand(TFLiteral);
+  Operand(TString);
+  Operand(TSymbol);
+  Operand(TStackRef);
+  Operand(TFuncRef);
 
   Operand(const Operand &o);
 

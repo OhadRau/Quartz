@@ -81,10 +81,12 @@ end
 session Timer < exists S. [s : S] -> ?s{Start ~> ?s{Stop ~> !s{Took(int) ~> End}}} >:
   # push s
   await_msg [0]
-  cmp $Start _nomatch0
+  cmp $Start
+  jne _nomatch0
   call_function @std::get_time_ms
   await_msg [-1]
-  cmp $Stop _nomatch0
+  cmp $Stop
+  jne _nomatch0
   pop
   call_function @std::get_time_ms
   sub
@@ -101,10 +103,13 @@ session P < exists Q. (q : Q) -> [t : Timer] -> !t{Start ~> !q{Ping ~> ?q{Pong ~
   send_msg [0] $Start
   send_msg [-1] $Ping
   await_msg [-1]
-  cmp $Pong _nomatch0
+  cmp $Pong
+  jne _nomatch0
   send_msg [-1] $Stop
-  await_msg(1) [-1]    # Takes an additional arg (goes argN, ..., arg0, msg)
-  cmp $Took _nomatch1
+  await_msg(1) [-1]    # Takes an additional arg (goes argN, ..., arg0, N, msg)
+  cmp $Took
+  jne _nomatch1
+  pop
   pop
   call_function @std::print
   close
@@ -118,7 +123,8 @@ session P < exists Q. (q : Q) -> [t : Timer] -> !t{Start ~> !q{Ping ~> ?q{Pong ~
 session Q < exists P. (p : P) -> ?p{Ping ~> !p{Pong ~> End}} >:
   # push p
   await_msg [0]            # Await a message from p
-  cmp $Ping _nomatch0  # Compare last item on stack (the message) to $Ping
+  cmp $Ping # Compare last item on stack (the message) to $Ping
+  jne _nomatch0
   push 10
   call_function @std::wait
   send_msg [-1] $Pong      # Send $Pong to p
