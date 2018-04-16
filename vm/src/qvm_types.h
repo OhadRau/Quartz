@@ -70,7 +70,8 @@ struct QzDatum {
     std::size_t                  symbol;
     std::shared_ptr<std::string> string;
     std::shared_ptr<QzFunction>  function;
-    std::shared_ptr<QzThread>    thread;
+//    std::shared_ptr<QzThread>    thread;
+    std::thread::id              thread;
     std::array<int8_t, 16>       internal;
   };
 
@@ -83,7 +84,8 @@ struct QzDatum {
   QzDatum(std::string s);
   QzDatum(std::shared_ptr<std::string> s);
   QzDatum(std::shared_ptr<QzFunction> f);
-  QzDatum(std::shared_ptr<QzThread> t);
+//  QzDatum(std::shared_ptr<QzThread> t);
+  QzDatum(std::thread::id);
   QzDatum(std::array<std::int8_t, 16> a);
 
   QzDatum &operator=(const QzDatum &d);

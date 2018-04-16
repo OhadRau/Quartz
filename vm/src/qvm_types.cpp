@@ -72,7 +72,7 @@ QzDatum::QzDatum(std::shared_ptr<QzFunction> f) : function{} {
   this->function = f;
 }
 
-QzDatum::QzDatum(std::shared_ptr<QzThread> t) : thread{} {
+QzDatum::QzDatum(std::thread::id t) {
   this->type = QZ_DATUM_THREAD;
   this->thread = t;
 }
@@ -138,9 +138,6 @@ QzDatum::~QzDatum() {
   case QZ_DATUM_FUNCTION_POINTER:
     this->function.~shared_ptr();
     break;
-  case QZ_DATUM_THREAD:
-    this->thread.~shared_ptr();
-    break;
   }
 }
 
@@ -168,6 +165,7 @@ std::shared_ptr<QzThread> QzThread::create(std::shared_ptr<QzVm> vm) {
 void QzThread::kill() {
   if (this->type == QZ_THREAD_LOCAL)
     this->local.vm->thread_map.erase(this->thread_id);
+  this->pause();
 }
 
 void QzThread::enqueue_msg(QzMessage m) {

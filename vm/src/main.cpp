@@ -49,22 +49,20 @@ int main(int argc, char **argv) {
 
   auto vm = QzVm::create_and_run(256, 131072, functions, instrs);
 
-  QzDatum threadA(QzThread::create(vm));
-  QzDatum threadB(QzThread::create(vm));
+  auto threadA = QzThread::create(vm);
+  auto threadB = QzThread::create(vm);
 
-  threadB.thread->exec_function("wait_for_hello");
-  threadB.thread->resume();
+  threadB->exec_function("wait_for_hello");
+  threadB->resume();
 
-  if (threadA.type == QZ_DATUM_THREAD && threadB.type == QZ_DATUM_THREAD) {
-    threadB.thread->enqueue_msg(
-      QzMessage {
-        .message_symbol = std::hash<std::string>{}("Hello"),
-        .message_name   = "Hello",
-        .message_params = std::vector<QzDatum>(),
-        .sender_id      = threadA.thread->thread_id
-      }
-    );
-  }
+  threadB->enqueue_msg(
+    QzMessage {
+      .message_symbol = std::hash<std::string>{}("Hello"),
+      .message_name   = "Hello",
+      .message_params = std::vector<QzDatum>(),
+      .sender_id      = threadA->thread_id
+    }
+  );
 
   while (true) {}
 }
