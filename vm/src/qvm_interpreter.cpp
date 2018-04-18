@@ -19,6 +19,7 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
                   std::shared_ptr<QzContext> ctx,
                   std::shared_ptr<std::queue<QzMessage>> msgs) {
   auto hash = std::hash<std::string>{};
+  auto idHash = std::hash<std::thread::id>{};
   while (true) { // NOTE: This doesn't actually take thread_id, messages into account
     while (!ctx->thread_running)
       std::this_thread::sleep_for(std::chrono::milliseconds(5)); // TODO: HACK: Should use concurrency primitives
@@ -250,23 +251,39 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
           PUSH(tmp1.float_ - tmp2.float_);
         } else if (tmp1.type == QZ_DATUM_SYMBOL && tmp2.type == QZ_DATUM_SYMBOL) {
           PUSH(tmp1.symbol - tmp2.symbol);
+        } else if (tmp1.type == QZ_DATUM_STRING && tmp2.type == QZ_DATUM_STRING) {
+          PUSH((std::int64_t) tmp1.string->compare(*tmp2.string));
+        } else if (tmp1.type == QZ_DATUM_THREAD && tmp2.type == QZ_DATUM_THREAD) {
+          PUSH(idHash(tmp1.thread) - idHash(tmp2.thread));
+        } else { // QZ_DATUM_FUNCTION_POINTER, QZ_DATUM_INTERNAL, types not equal => false
+          PUSH((std::int64_t) -1);
         }
       } else if (!instr.rand2) {
         auto tmp = POP();
-        if (instr.rand1->type == ILiteral) {
+        if (instr.rand1->type == ILiteral && tmp.type == QZ_DATUM_INT) {
           PUSH(instr.rand1->int_ - tmp.int_);
-        } else if (instr.rand1->type == FLiteral) {
+        } else if (instr.rand1->type == FLiteral && tmp.type == QZ_DATUM_FLOAT) {
           PUSH(instr.rand1->float_ - tmp.float_);
-        } else if (instr.rand1->type == Symbol) {
+        } else if (instr.rand1->type == String && tmp.type == QZ_DATUM_STRING) {
+          PUSH((std::int64_t) instr.rand1->string->compare(*tmp.string));
+        } else if (instr.rand1->type == Symbol && tmp.type == QZ_DATUM_SYMBOL) {
           PUSH(hash(*instr.rand1->symbol) - tmp.symbol);
-        }
+        } else if (instr.rand1->type == StackRef && tmp.type == QZ_DATUM_THREAD) {
+          PUSH(idHash(ctx->stack[ctx->stack_ptr + instr.rand1->stackref - 1].thread) - idHash(tmp.thread));
+        } else {
+          PUSH((std::int64_t) -1);
+        } // QZ_DATUM_FUNCTION_POINTER, QZ_DATUM_INTERNAL, types not equal => false
       } else {
         if (instr.rand1->type == ILiteral) {
           PUSH(instr.rand1->int_ - instr.rand2->int_);
         } else if (instr.rand1->type == FLiteral) {
           PUSH(instr.rand1->float_ - instr.rand2->float_);
+        } else if (instr.rand1->type == String) {
+          PUSH((std::int64_t) instr.rand1->string->compare(*instr.rand2->string));
         } else if (instr.rand1->type == Symbol) {
           PUSH(hash(*instr.rand1->symbol) - hash(*instr.rand2->symbol));
+        } else { // QZ_DATUM_FUNCTION_POINTER, QZ_DATUM_THREAD, types not equal => false
+          PUSH((std::int64_t) -1);
         }
       }
       break;
@@ -349,9 +366,6 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
       }
       break;
     }
-    case CLOSE: {
-      return;
-    }
     case AWAIT_MSG: {
       if (!instr.rand1) {
         while (msgs->empty()) {
@@ -366,6 +380,12 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
         }
       }
       break;
+    }
+    case CLOSE: {
+      return;
+    }
+    case CLOSE_ERR: {
+      throw instr.rand1->string;
     }
     }
   }
