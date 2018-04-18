@@ -27,6 +27,7 @@ enum Opcode {
   SWAP,
   EXCHANGE,
   CMP,
+  TCHECK,
   JEQ,
   JNE,
   JLT,

@@ -10,8 +10,9 @@
 
 #define PUSH(X)     ctx->stack[ctx->stack_ptr++] = QzDatum(X)
 #define PUSH_RAW(X) ctx->stack[ctx->stack_ptr++] = X
-#define POP()       ((QzDatum) ctx->stack[--ctx->stack_ptr])
-#define PEEK()      ((QzDatum) ctx->stack[ctx->stack_ptr - 1])
+#define POP()       ctx->stack[--ctx->stack_ptr]
+#define PEEK()      ctx->stack[ctx->stack_ptr - 1]
+#define DEREF(X)    ctx->stack[ctx->stack_ptr + X - 1]
 
 namespace qz { namespace vm {
 
@@ -231,14 +232,14 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
     }
     case SWAP: {
       auto tmp = PEEK();
-      ctx->stack[ctx->stack_ptr - 1] = ctx->stack[ctx->stack_ptr - 2];
-      ctx->stack[ctx->stack_ptr - 2] = tmp;
+      DEREF(0) = DEREF(-1);
+      DEREF(-1) = tmp;
       break;
     }
     case EXCHANGE: {
-      auto tmp = ctx->stack[ctx->stack_ptr + instr.rand1->stackref - 1];
-      ctx->stack[ctx->stack_ptr + instr.rand1->stackref - 1] = ctx->stack[ctx->stack_ptr + instr.rand2->stackref - 1];
-      ctx->stack[ctx->stack_ptr + instr.rand1->stackref - 1] = tmp;
+      auto tmp = DEREF(instr.rand1->stackref);
+      DEREF(instr.rand1->stackref) = DEREF(instr.rand2->stackref);
+      DEREF(instr.rand1->stackref) = tmp;
       break;
     }
     case CMP: { // TODO: ** Should ** allow for more than just int/float comparisons
@@ -269,7 +270,7 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
         } else if (instr.rand1->type == Symbol && tmp.type == QZ_DATUM_SYMBOL) {
           PUSH(hash(*instr.rand1->symbol) - tmp.symbol);
         } else if (instr.rand1->type == StackRef && tmp.type == QZ_DATUM_THREAD) {
-          PUSH(idHash(ctx->stack[ctx->stack_ptr + instr.rand1->stackref - 1].thread) - idHash(tmp.thread));
+          PUSH(idHash(DEREF(instr.rand1->stackref).thread) - idHash(tmp.thread));
         } else {
           PUSH((std::int64_t) -1);
         } // QZ_DATUM_FUNCTION_POINTER, QZ_DATUM_INTERNAL, types not equal => false
@@ -288,26 +289,121 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
       }
       break;
     }
+    case TCHECK: {
+      switch (instr.rand1->type) {
+      case ILiteral:
+        if (hash(*instr.rand2->symbol) == hash("INT")) {
+          PUSH((std::int64_t) 0);
+        } else {
+          PUSH((std::int64_t) -1);
+        }
+        break;
+      case FLiteral:
+        if (hash(*instr.rand2->symbol) == hash("FLOAT")) {
+          PUSH((std::int64_t) 0);
+        } else {
+          PUSH((std::int64_t) -1);
+        }
+        break;
+      case String:
+        if (hash(*instr.rand2->symbol) == hash("STRING")) {
+          PUSH((std::int64_t) 0);
+        } else {
+          PUSH((std::int64_t) -1);
+        }
+        break;
+      case Symbol:
+        if (hash(*instr.rand2->symbol) == hash("SYMBOL")) {
+          PUSH((std::int64_t) 0);
+        } else {
+          PUSH((std::int64_t) -1);
+        }
+        break;
+      case StackRef: {
+        auto tmp = DEREF(instr.rand1->stackref);
+        switch (tmp.type) {
+        case QZ_DATUM_INT:
+          if (hash(*instr.rand2->symbol) == hash("INT")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        case QZ_DATUM_FLOAT:
+          if (hash(*instr.rand2->symbol) == hash("FLOAT")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        case QZ_DATUM_STRING:
+          if (hash(*instr.rand2->symbol) == hash("STRING")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        case QZ_DATUM_SYMBOL:
+          if (hash(*instr.rand2->symbol) == hash("SYMBOL")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        case QZ_DATUM_FUNCTION_POINTER:
+          if (hash(*instr.rand2->symbol) == hash("FUNCTION")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        case QZ_DATUM_THREAD:
+          if (hash(*instr.rand2->symbol) == hash("THREAD")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        case QZ_DATUM_INTERNAL:
+          if (hash(*instr.rand2->symbol) == hash("INTERNAL")) {
+            PUSH((std::int64_t) 0);
+          } else {
+            PUSH((std::int64_t) -1);
+          }
+          break;
+        }
+        break;
+      }
+      case FuncRef:
+        if (hash(*instr.rand2->symbol) == hash("FUNCTION")) {
+          PUSH((std::int64_t) 0);
+        } else {
+          PUSH((std::int64_t) -1);
+        }
+        break;
+      }
+      break;
+    }
     case JEQ: {
-      if (ctx->stack[ctx->stack_ptr - 1].int_ == 0) {
+      if (DEREF(0).int_ == 0) {
         ctx->instr_ptr = instr.rand1->int_;
       }
       break;
     }
     case JNE: {
-      if (ctx->stack[ctx->stack_ptr - 1].int_ != 0) {
+      if (DEREF(0).int_ != 0) {
         ctx->instr_ptr = instr.rand1->int_;
       }
       break;
     }
     case JLT: {
-      if (ctx->stack[ctx->stack_ptr - 1].int_ < 0) {
+      if (DEREF(0).int_ < 0) {
         ctx->instr_ptr = instr.rand1->int_;
       }
       break;
     }
     case JGT: {
-      if (ctx->stack[ctx->stack_ptr - 1].int_ > 0) {
+      if (DEREF(0).int_ > 0) {
         ctx->instr_ptr = instr.rand1->int_;
       }
       break;
@@ -352,7 +448,7 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
           d = QzDatum(hash(*instr.rand1->symbol));
           break;
         case StackRef:
-          d = ctx->stack[ctx->stack_ptr + instr.rand1->stackref - 1];
+          d = DEREF(instr.rand1->stackref);
           break;
         case FuncRef:
           d = QzDatum(std::make_shared<QzFunction>(vm->function_table[*instr.rand1->funcref]));
