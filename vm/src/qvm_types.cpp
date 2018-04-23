@@ -17,7 +17,6 @@ QzVm::QzVm(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction
   for (auto fn : program) {
     this->function_table[fn.name] = fn;
   }
-
 }
 
 std::shared_ptr<QzVm> QzVm::create_and_run(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<Instruction> instrs) {

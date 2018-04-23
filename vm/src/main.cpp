@@ -42,6 +42,12 @@ int main(int argc, char **argv) {
     Instruction(JEQ, Operand(TILiteral {0})),
     Instruction(SPAWN_EMPTY),
     Instruction(PUSH, Operand(TString {"Hello from constructor 1"})),
+    /* WEIRDEST FUCKING ERROR:
+       Replace this with any other opcode and it works without a hitch. Comment it out and it works too.
+       But if this is placed on this line, we get a segfault on QzThread::create(vm); in this file.
+       Seems to somehow break the way the vm gets copied with this instruction vector. This makes literally
+       0 sense and I'm convinced this is some kind of compiler/STL bug because I can't see how my code would
+       actually affect what is happening on that line. */
     Instruction(CONSTRUCT_ASYNC, Operand(TILiteral {1}), Operand(TFuncRef {"std::print"})),
     Instruction(SPAWN_EMPTY),
     Instruction(PUSH, Operand(TString {"Hello from constructor 2"})),

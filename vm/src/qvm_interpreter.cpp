@@ -463,7 +463,6 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
       break;
     }
     case CONSTRUCT_ASYNC: {
-      std::cout << "Constructing" << std::endl;
       if (instr.rand1->type == FuncRef) {
         auto fn = instr.rand1->funcref;
         auto thread = instr.rand2 ? vm->thread_map[DEREF(instr.rand2->stackref).thread] : vm->thread_map[POP().thread];
@@ -486,7 +485,6 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
       break;
     }
     case SPAWN_EMPTY: {
-      std::cout << "Spawning" << std::endl;
       auto thread = QzThread::create(vm);
       PUSH(thread->thread_id);
       break;

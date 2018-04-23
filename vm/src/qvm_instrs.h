@@ -35,7 +35,6 @@ enum Opcode {
   JMP,
   CALL,
   RET,
-  CONSTRUCT,
   CONSTRUCT_ASYNC,
   SPAWN_EMPTY,
   SPAWN_CONSTRUCT,
@@ -59,7 +58,7 @@ struct TILiteral { std::int64_t i; };
 struct TFLiteral { double f; };
 struct TString { std::string s; };
 struct TSymbol { std::string s; };
-struct TStackRef { std::size_t s; };
+struct TStackRef { std::int64_t s; };
 struct TFuncRef { std::string f; };
 
 struct Operand {
@@ -70,7 +69,7 @@ struct Operand {
     double                       float_;
     std::shared_ptr<std::string> string;
     std::shared_ptr<std::string> symbol;
-    std::size_t                  stackref;
+    std::int64_t                 stackref;
     std::shared_ptr<std::string> funcref;
   };
 
