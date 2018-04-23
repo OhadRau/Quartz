@@ -462,6 +462,35 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
       }
       break;
     }
+    case CONSTRUCT_ASYNC: {
+      std::cout << "Constructing" << std::endl;
+      if (instr.rand1->type == FuncRef) {
+        auto fn = instr.rand1->funcref;
+        auto thread = instr.rand2 ? vm->thread_map[DEREF(instr.rand2->stackref).thread] : vm->thread_map[POP().thread];
+        thread->exec_function(*fn);
+        thread->resume();
+      } else {
+        auto param_count = instr.rand1->int_;
+        auto fn = instr.rand2->funcref;
+        auto thread = instr.rand3 ? vm->thread_map[DEREF(instr.rand3->stackref).thread] : vm->thread_map[DEREF(param_count).thread];
+        if (thread->type == QZ_THREAD_LOCAL) {
+          auto lctx = thread->local.ctx;
+          for (auto i = 0; i < param_count; i++) {
+            std::cout << "T[" << lctx->stack_ptr + 1 << "] <- [" << i - param_count << "]" << std::endl;
+            lctx->stack[lctx->stack_ptr++] = DEREF(i - param_count);
+          }
+        }
+        thread->exec_function(*fn);
+        thread->resume();
+      }
+      break;
+    }
+    case SPAWN_EMPTY: {
+      std::cout << "Spawning" << std::endl;
+      auto thread = QzThread::create(vm);
+      PUSH(thread->thread_id);
+      break;
+    }
     case AWAIT_MSG: {
       if (!instr.rand1) {
         while (msgs->empty()) {

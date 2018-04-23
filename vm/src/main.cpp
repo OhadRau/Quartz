@@ -9,10 +9,6 @@
 using namespace qz::vm;
 
 int main(int argc, char **argv) {
-  // stack_size: 256 * 8 * 8 = 16KiB
-  // heap_size: 131072 * 8 = 2MiB
-  // stack_size: 256 * 8 = 2KiB
-  // stack_size: 256 * 8 = 2KiB
   auto functions = std::vector<QzFunction> {
     QzFunction {
       .name = "<QZ%START>",
@@ -44,10 +40,18 @@ int main(int argc, char **argv) {
     Instruction(AWAIT_MSG),
     Instruction(CMP, Operand(TSymbol {"Hello"})),
     Instruction(JEQ, Operand(TILiteral {0})),
-    Instruction(CLOSE)
+    Instruction(SPAWN_EMPTY),
+    Instruction(PUSH, Operand(TString {"Hello from constructor 1"})),
+    Instruction(CONSTRUCT_ASYNC, Operand(TILiteral {1}), Operand(TFuncRef {"std::print"})),
+    Instruction(SPAWN_EMPTY),
+    Instruction(PUSH, Operand(TString {"Hello from constructor 2"})),
+    Instruction(CONSTRUCT_ASYNC, Operand(TILiteral {1}), Operand(TFuncRef {"std::print"}), Operand(TStackRef {-2})),
+    Instruction(CLOSE),
   };
 
-  auto vm = QzVm::create_and_run(256, 131072, functions, instrs);
+  // stack_size: 512 * 8 * 8 = 32KiB
+  // heap_size: 67108864 * 8 = 64MiB
+  auto vm = QzVm::create_and_run(512, 67108864, functions, instrs);
 
   auto threadA = QzThread::create(vm);
   auto threadB = QzThread::create(vm);
