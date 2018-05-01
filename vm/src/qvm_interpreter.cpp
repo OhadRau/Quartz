@@ -25,9 +25,13 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
     while (!ctx->thread_running)
       std::this_thread::sleep_for(std::chrono::milliseconds(5)); // TODO: HACK: Should use concurrency primitives
 
+    vm->vm_lock.lock();
     auto instr = *((Instruction *) &vm->heap[ctx->instr_ptr]); // HACK: WARNING: INCREMENTS IP BY DEFAULT
+    vm->vm_lock.unlock();
     std::cout << "\tIP=" << ctx->instr_ptr << ", OP=" << instr.rator << std::endl;
+    
     ctx->instr_ptr += sizeof(Instruction);
+
     switch(instr.rator) {
     case NOP: {
       break;
@@ -48,7 +52,9 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
         PUSH(hash(*instr.rand1->symbol));
         break;
       case FuncRef:
+        vm->vm_lock.lock();
         PUSH(std::make_shared<QzFunction>(vm->function_table[*instr.rand1->funcref]));
+        vm->vm_lock.unlock();
         break;
       }
       break;
@@ -413,7 +419,9 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
       break;
     }
     case CALL: {
+      vm->vm_lock.lock();
       auto fn = vm->function_table[*instr.rand1->funcref];
+      vm->vm_lock.unlock();
       if (fn.lambda) {
         auto fn_lambda = *fn.lambda;
         fn_lambda(vm, ctx);
@@ -451,7 +459,9 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
           d = DEREF(instr.rand1->stackref);
           break;
         case FuncRef:
+          vm->vm_lock.lock();
           d = QzDatum(std::make_shared<QzFunction>(vm->function_table[*instr.rand1->funcref]));
+          vm->vm_lock.lock();
           break;
         }
         ctx->instr_ptr = ctx->stack[ctx->frame_ptr - 1].int_;
@@ -465,13 +475,17 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
     case CONSTRUCT_ASYNC: {
       if (instr.rand1->type == FuncRef) {
         auto fn = instr.rand1->funcref;
+        vm->vm_lock.lock();
         auto thread = instr.rand2 ? vm->thread_map[DEREF(instr.rand2->stackref).thread] : vm->thread_map[POP().thread];
+        vm->vm_lock.lock();
         thread->exec_function(*fn);
         thread->resume();
       } else {
         auto param_count = instr.rand1->int_;
         auto fn = instr.rand2->funcref;
+        vm->vm_lock.lock();
         auto thread = instr.rand3 ? vm->thread_map[DEREF(instr.rand3->stackref).thread] : vm->thread_map[DEREF(param_count).thread];
+        vm->vm_lock.unlock();
         if (thread->type == QZ_THREAD_LOCAL) {
           auto lctx = thread->local.ctx;
           for (auto i = 0; i < param_count; i++) {

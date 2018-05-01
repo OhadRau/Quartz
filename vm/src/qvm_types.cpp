@@ -5,6 +5,8 @@
 namespace qz { namespace vm {
 
 QzVm::QzVm(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<Instruction> instrs) {
+  std::lock_guard<std::mutex> lock(this->vm_lock);
+
   this->stack_size = stack_size;
   this->heap_size = heap_size;
 
@@ -12,7 +14,7 @@ QzVm::QzVm(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction
   int8_t *ibase_ptr = (int8_t *)&instrs[0];
   for (int i = 0; i < instrs.size() * sizeof(Instruction); i++)
     this->heap[i] = ibase_ptr[i];
-  // TODO: Allocate portions of the heap, fill with instructions
+  // TODO: Allocate portions of the heap
 
   for (auto fn : program) {
     this->function_table[fn.name] = fn;
@@ -141,6 +143,8 @@ QzDatum::~QzDatum() {
 }
 
 QzThread::QzThread(std::shared_ptr<QzVm> vm) {
+  std::lock_guard<std::mutex> lock(vm->vm_lock);
+
   this->type = QZ_THREAD_LOCAL;
 
   this->local.vm = vm;
@@ -155,6 +159,8 @@ QzThread::QzThread(std::shared_ptr<QzVm> vm) {
 std::shared_ptr<QzThread> QzThread::create(std::shared_ptr<QzVm> vm) {
   std::shared_ptr<QzThread> qt = std::make_shared<QzThread>(vm);
 
+  std::lock_guard<std::mutex> lock(vm->vm_lock);
+
   if (qt->type == QZ_THREAD_LOCAL)
     vm->thread_map[qt->thread_id] = qt;
 
@@ -162,6 +168,8 @@ std::shared_ptr<QzThread> QzThread::create(std::shared_ptr<QzVm> vm) {
 }
 
 void QzThread::kill() {
+  std::lock_guard<std::mutex> lock(this->local.vm->vm_lock);
+
   if (this->type == QZ_THREAD_LOCAL)
     this->local.vm->thread_map.erase(this->thread_id);
   this->pause();
@@ -178,6 +186,8 @@ void QzThread::clear_msg_queue() {
 }
 
 void QzThread::exec_function(std::string name) { // Assumes you already pushed the params
+  std::lock_guard<std::mutex> lock(this->local.vm->vm_lock);
+
   if (this->type == QZ_THREAD_LOCAL) {
     this->pause();
     auto found = this->local.vm->function_table.find(name);

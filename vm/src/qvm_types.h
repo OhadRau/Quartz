@@ -3,6 +3,7 @@
 
 #include <map>
 #include <array>
+#include <mutex>
 #include <queue>
 #include <memory>
 #include <thread>
@@ -24,6 +25,8 @@ struct QzThread;
 struct QzMessage;
 
 struct QzVm {
+  std::mutex vm_lock;
+
   std::size_t stack_size;
   std::size_t heap_size;
 
@@ -40,6 +43,10 @@ struct QzVm {
   static std::shared_ptr<QzVm> create_and_run(std::size_t stack_size, std::size_t heap_size, std::vector<QzFunction> program, std::vector<Instruction> instrs);
 };
 
+// Should be thread-safe. The assumption is that the only time this is accessed from another thread
+// is when the thread holding the context has yielded control, for example when executing a native
+// function (wherein the thread pauses, and the native function can deal with threading issues if
+// that is necessary).
 struct QzContext {
   bool thread_running;
 
@@ -70,7 +77,6 @@ struct QzDatum {
     std::size_t                  symbol;
     std::shared_ptr<std::string> string;
     std::shared_ptr<QzFunction>  function;
-//    std::shared_ptr<QzThread>    thread;
     std::thread::id              thread;
     std::array<int8_t, 16>       internal;
   };
@@ -84,7 +90,6 @@ struct QzDatum {
   QzDatum(std::string s);
   QzDatum(std::shared_ptr<std::string> s);
   QzDatum(std::shared_ptr<QzFunction> f);
-//  QzDatum(std::shared_ptr<QzThread> t);
   QzDatum(std::thread::id);
   QzDatum(std::array<std::int8_t, 16> a);
 
@@ -125,6 +130,15 @@ struct QzThread {
 
   QzThread(std::shared_ptr<QzVm> vm);
 
+  // FUTURE: We could switch to a single unique_ptr to the thread and
+  // simply return the thread ID here. However, this would require us
+  // to move all thread related function outside the QzThread class.
+  // So for example we could do qz::vm::send(thread, "kill"); or even
+  // thread_ref.kill(), which would wrap that. However, it's not clear
+  // whether this is really worth adding or not so I'll leave it for
+  // now. The one nice thing is I could move away from a union and
+  // instead have a QzThread class that Local and Foreign both inherit
+  // from.
   static std::shared_ptr<QzThread> create(std::shared_ptr<QzVm> vm);
 
   ~QzThread();

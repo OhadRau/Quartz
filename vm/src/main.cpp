@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
     Instruction(PUSH, Operand(TString {"Hello from constructor 1"})),
     /* WEIRDEST FUCKING ERROR:
        Replace this with any other opcode and it works without a hitch. Comment it out and it works too.
+       As in, the next CONSTRUCT_ASYNC works just fine as long as it's not right here in the vector.
        But if this is placed on this line, we get a segfault on QzThread::create(vm); in this file.
        Seems to somehow break the way the vm gets copied with this instruction vector. This makes literally
        0 sense and I'm convinced this is some kind of compiler/STL bug because I can't see how my code would
@@ -54,6 +55,26 @@ int main(int argc, char **argv) {
     Instruction(CONSTRUCT_ASYNC, Operand(TILiteral {1}), Operand(TFuncRef {"std::print"}), Operand(TStackRef {-2})),
     Instruction(CLOSE),
   };
+
+/*
+<QZ%START>:
+  push "Hello, world!"
+  call @std::print
+  close
+wait_for_hello:
+  push "Awaiting messages!"
+  call @std::print
+  await_msg
+  cmp $Hello
+  jeq <QZ%START> // print "Hello, world!"
+  spawn_empty
+  push "Hello from constructor 1"
+  construct_async(1) @std::print
+  spawn_empty
+  push "Hello from constructor 2"
+  construct_async(1) @std::print [-2]
+  close
+*/
 
   // stack_size: 512 * 8 * 8 = 32KiB
   // heap_size: 67108864 * 8 = 64MiB
