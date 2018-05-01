@@ -105,6 +105,11 @@ struct QzFunction {
   std::optional<std::function<void(std::shared_ptr<QzVm>, std::shared_ptr<QzContext>)>> lambda;
 };
 
+struct QzMailbox {
+  std::mutex mail_lock;
+  std::queue<QzMessage> message_queue;
+};
+
 enum QzThreadType {
   QZ_THREAD_LOCAL,
   QZ_THREAD_FOREIGN
@@ -114,7 +119,7 @@ struct QzLocalThread {
   std::shared_ptr<QzVm> vm;
   std::shared_ptr<QzContext> ctx;
   std::shared_ptr<std::thread> thread;
-  std::shared_ptr<std::queue<QzMessage>> message_queue;
+  std::shared_ptr<QzMailbox> mailbox;
 };
 
 struct QzThread {

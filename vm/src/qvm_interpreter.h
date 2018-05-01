@@ -7,7 +7,7 @@ namespace qz { namespace vm {
 
 void qz_run_local(std::shared_ptr<QzVm> vm,
                   std::shared_ptr<QzContext> ctx,
-                  std::shared_ptr<std::queue<QzMessage>> message_queue);
+                  std::shared_ptr<QzMailbox> message_queue);
 
 } }
 

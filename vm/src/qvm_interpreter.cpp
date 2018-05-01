@@ -18,7 +18,7 @@ namespace qz { namespace vm {
 
 void qz_run_local(std::shared_ptr<QzVm> vm,
                   std::shared_ptr<QzContext> ctx,
-                  std::shared_ptr<std::queue<QzMessage>> msgs) {
+                  std::shared_ptr<QzMailbox> msgs) {
   auto hash = std::hash<std::string>{};
   auto idHash = std::hash<std::thread::id>{};
   while (true) { // NOTE: This doesn't actually take thread_id, messages into account
@@ -505,11 +505,13 @@ void qz_run_local(std::shared_ptr<QzVm> vm,
     }
     case AWAIT_MSG: {
       if (!instr.rand1) {
-        while (msgs->empty()) {
+        msgs->mail_lock.lock();
+        while (msgs->message_queue.empty()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(5)); // TODO: HACK: Should use concurrency primitives
         }
-        PUSH(msgs->front().message_symbol);
-        msgs->pop();
+        PUSH(msgs->message_queue.front().message_symbol);
+        msgs->message_queue.pop();
+        msgs->mail_lock.unlock();
       } else if (instr.rand1->type == StackRef) {
       } else if (instr.rand1->type == ILiteral) {
         if (!instr.rand2) {

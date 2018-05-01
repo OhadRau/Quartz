@@ -149,8 +149,8 @@ QzThread::QzThread(std::shared_ptr<QzVm> vm) {
 
   this->local.vm = vm;
   this->local.ctx = std::make_shared<QzContext>(vm->stack_size);
-  this->local.message_queue = std::make_shared<std::queue<QzMessage>>();
-  this->local.thread = std::make_shared<std::thread>(&qz_run_local, vm, this->local.ctx, this->local.message_queue);
+  this->local.mailbox = std::make_shared<QzMailbox>();
+  this->local.thread = std::make_shared<std::thread>(&qz_run_local, vm, this->local.ctx, this->local.mailbox);
   this->local.thread->detach();
 
   this->thread_id = this->local.thread->get_id();
@@ -176,13 +176,17 @@ void QzThread::kill() {
 }
 
 void QzThread::enqueue_msg(QzMessage m) {
+  this->local.mailbox->mail_lock.lock();
   if (this->type == QZ_THREAD_LOCAL)
-    this->local.message_queue->push(m);
+    this->local.mailbox->message_queue.push(m);
+  this->local.mailbox->mail_lock.unlock();
 }
 
 void QzThread::clear_msg_queue() {
+  this->local.mailbox->mail_lock.lock();
   if (this->type == QZ_THREAD_LOCAL)
-    this->local.message_queue = std::make_shared<std::queue<QzMessage>>();
+    this->local.mailbox = std::make_shared<QzMailbox>();
+  this->local.mailbox->mail_lock.unlock(); // Not strictly necessary
 }
 
 void QzThread::exec_function(std::string name) { // Assumes you already pushed the params
